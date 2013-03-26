@@ -11,6 +11,10 @@
 
 """Quick and dirty debugging output for tired programmers.
 
+All output goes to /tmp/q, which you can watch with this shell command:
+
+    tail -f /tmp/q
+
 To print the value of foo, insert this into your program:
 
     import q; q(foo)
@@ -25,13 +29,13 @@ To trace a function's arguments and return value, insert this above the def:
 
     import q
     @q
-
-Output will appear in /tmp/q, which you can watch with this shell command:
-
-    tail -f /tmp/q
 """
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
+
+# WARNING: Horrible abuse of sys.modules, __call__, __div__, _getframe, ast,
+# inspect, and more!  q's behaviour changes depending on the text of the source
+# code near its call site.  Don't ever do this in real code!
 
 # These are reused below in both Q and Writer.
 ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
