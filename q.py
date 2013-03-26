@@ -12,217 +12,266 @@
 """Quick and dirty debugging output for tired programmers.
 
 To print the value of foo, insert this into your program:
-    import q; q.q(foo)
+    import q; q(foo)
 
-To trace a function's arguments and return value, insert this above the def:
+Use "q/" to print the value of something in the middle of an expression,
+while leaving the result unaffected:
+    x = q/y + z
+
+To trace a function's arguments and return value, insert '@q' just above
+the function definition, like this:
     import q
-    @q.t
+    @q
+    def foo(a, b, c):
+        ...
 
-The output will appear in /tmp/q, which you can watch with this shell command:
+Output will appear in /tmp/q, which you can watch with this shell command:
     tail -f /tmp/q
 """
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
-import ast, inspect, os, pydoc, sys, random, re, time
+# These are reused below in both Q and Writer.
+ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
 
-OUTPUT_PATH = '/tmp/q'
+# When we insert Q() into sys.modules, all the globals become None, so we
+# have to keep everything we use inside the Q class.
+class Q(object):
+    __doc__ = __doc__  # from the module's __doc__ above
 
-BOLD, NORMAL = '\x1b[1m', '\x1b[0m'
-RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ('\x1b[3%dm' % i for i in range(1, 7))
+    import ast, inspect, pydoc, sys, random, re, time
 
-def is_visible(x):
-    return not x.startswith('\x1b')
+    # The debugging log will go to this file; temporary files will also have
+    # this path as a prefix, followed by a random number.
+    OUTPUT_PATH = '/tmp/q'
 
-# TODO: Use colour to distinguish '...' elision from actual '...' characters.
-# TODO: Show a nicer repr for SRE.Match objects.
-# TODO: Show a nicer repr for big multiline strings.
+    NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
+    TEXT_REPR = pydoc.TextRepr()
 
-text_repr = pydoc.TextRepr()
-def safe_repr(value):
-    result = text_repr.repr(value)
-    if isinstance(value, basestring) and len(value) > 80:
-        # If the string is big, save it to a file for later examination.
-        if isinstance(value, unicode):
-            value = value.encode('utf-8')
-        name = '/tmp/q%08d.txt' % random.randrange(1e8)
-        f = open(name, 'w')
-        f.write(value)
-        f.close()
-        result += ' (file://' + name + ')'
-    return result
+    class FileWriter(object):
+        """An object that appends to or overwrites a single file."""
 
-# App Engine's dev_appserver patches 'open' to simulate the production server's
-# security restrictions; we circumvent this to write to /tmp/q.
-if file.__name__ == 'FakeFile':  # dev_appserver's patched file object
-    original_file = file.__bases__[0]
-    def open(path, mode='r'):
-        if path == OUTPUT_PATH:
-            return original_file(path, mode)
-        return file(path, mode)
+        def __init__(self, path):
+            self.path = path
+            self.open = file
+            # App Engine's dev_appserver patches 'open' to simulate security
+            # restrictions in production; we circumvent this to write output.
+            if file.__name__ == 'FakeFile':  # dev_appserver's patched 'file'
+                self.open = file.__bases__[0]  # the original built-in 'file'
 
-class Writer:
-    """Abstract away the output pipe, timestamping, and color support."""
-
-    def __init__(self):
-        self.color = True
-        self.path = OUTPUT_PATH
-        self.gap_seconds = 2
-        self.start_time = time.time()
-        self.last_write = 0
-
-    def write(self, chunks):
-        """Writes out a list of strings as a single timestamped unit."""
-        if not self.color:
-            chunks = [x for x in chunks if is_visible(x)]
-        content = ''.join(chunks)
-
-        now = time.time()
-        prefix = '%4.1fs ' % ((now - self.start_time) % 100)
-        indent = ' ' * len(prefix)
-        if self.color:
-            prefix = YELLOW + prefix + NORMAL
-        if now - self.last_write >= self.gap_seconds:
-            prefix = '\n' + prefix
-        self.last_write = now
-
-        output = prefix + content.replace('\n', '\n' + indent)
-        if self.path:
+        def write(self, mode, content):
             try:
-                f = open(self.path, 'a')
-                f.write(output + '\n')
+                f = self.open(self.path, mode)
+                f.write(content)
                 f.close()
             except IOError:
                 pass
 
-class Stanza:
-    """Abstract away indentation and line-wrapping."""
+    class Writer:
+        """Abstract away the output pipe, timestamping, and color support."""
 
-    def __init__(self, indent=0, width=80 - 7):
-        self.chunks = [' '*indent]
-        self.indent = indent
-        self.column = indent
-        self.width = width
+        NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
 
-    def newline(self):
-        if len(self.chunks) > 1:
-            self.column = self.width
+        def __init__(self, file_writer, time):
+            self.color = True
+            self.file_writer = file_writer
+            self.gap_seconds = 2
+            self.time = time  # the 'time' module (needed because no globals)
+            self.start_time = self.time.time()
+            self.last_write = 0
 
-    def add(self, items, sep='', wrap=True):
-        """Adds a list of strings that are to be shown together on one line."""
-        items = map(str, items)
-        size = sum([len(x) for x in items if is_visible(x)])
-        if (wrap and self.column > self.indent and
-            self.column + len(sep) + size > self.width):
-            self.chunks.append(sep.rstrip() + '\n' + ' '*self.indent)
-            self.column = self.indent
-        else:
-            self.chunks.append(sep)
-            self.column += len(sep)
-        self.chunks.extend(items)
-        self.column += size
+        def write(self, chunks):
+            """Writes out a list of strings as a single timestamped unit."""
+            if not self.color:
+                chunks = [x for x in chunks if not x.startswith('\x1b')]
+            content = ''.join(chunks)
 
-writer = Writer()
-indent = 0
+            now = self.time.time()
+            prefix = '%4.1fs ' % ((now - self.start_time) % 100)
+            indent = ' ' * len(prefix)
+            if self.color:
+                prefix = self.YELLOW + prefix + self.NORMAL
+            if now - self.last_write >= self.gap_seconds:
+                prefix = '\n' + prefix
+            self.last_write = now
 
-def get_call_exprs(line):
-    """Gets the argument expressions from the source code of a function call."""
-    line = line.lstrip()
-    for node in ast.walk(ast.parse(line)):
-        if isinstance(node, ast.Call):
-            offsets = [arg.col_offset for arg in node.args]
-            if node.keywords:
-                line = line[:node.keywords[0].value.col_offset]
-                line = re.sub(r'\w+\s*=\s*$', '', line)
+            output = prefix + content.replace('\n', '\n' + indent)
+            self.file_writer.write('a', output + '\n')
+
+    class Stanza:
+        """Abstract away indentation and line-wrapping."""
+
+        def __init__(self, indent=0, width=80 - 7):
+            self.chunks = [' '*indent]
+            self.indent = indent
+            self.column = indent
+            self.width = width
+
+        def newline(self):
+            if len(self.chunks) > 1:
+                self.column = self.width
+
+        def add(self, items, sep='', wrap=True):
+            """Adds a list of strings that are to be printed on one line."""
+            items = map(str, items)
+            size = sum([len(x) for x in items if not x.startswith('\x1b')])
+            if (wrap and self.column > self.indent and
+                self.column + len(sep) + size > self.width):
+                self.chunks.append(sep.rstrip() + '\n' + ' '*self.indent)
+                self.column = self.indent
             else:
-                line = re.sub(r'\s*\)\s*$', '', line)
-            offsets.append(len(line))
-            args = []
-            for i in range(len(node.args)):
-                args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
-            return args
+                self.chunks.append(sep)
+                self.column += len(sep)
+            self.chunks.extend(items)
+            self.column += size
 
-def show(*args, **kwargs):
-    """Prints out some values."""
-    info = inspect.getframeinfo(sys._getframe(1))
-    exprs = get_call_exprs((info.code_context or [''])[0])
-    s = Stanza(indent)
-    s.add([GREEN, info.function, NORMAL, ': '])
-    if args:
-        if exprs:
+
+    def __init__(self):
+        self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
+        self.indent = 0
+
+    def unindent(self, lines):
+        """Removes any indentation that is common to all of the given lines."""
+        indent = min(len(self.re.match(r'^ *', line).group()) for line in lines)
+        return [line[indent:].rstrip() for line in lines]
+
+    def safe_repr(self, value):
+        # TODO: Use colour to distinguish '...' elision from actual '...' chars.
+        # TODO: Show a nicer repr for SRE.Match objects.
+        # TODO: Show a nicer repr for big multiline strings.
+        result = self.TEXT_REPR.repr(value)
+        if isinstance(value, basestring) and len(value) > 80:
+            # If the string is big, save it to a file for later examination.
+            if isinstance(value, unicode):
+                value = value.encode('utf-8')
+            path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
+            self.FileWriter(path).write('w', value)
+            result += ' (file://' + path + ')'
+        return result
+
+    def get_call_exprs(self, line):
+        """Gets the argument expressions from the source of a function call."""
+        line = line.lstrip()
+        try:
+            tree = self.ast.parse(line)
+        except SyntaxError:
+            return None
+        for node in self.ast.walk(tree):
+            if isinstance(node, self.ast.Call):
+                offsets = [arg.col_offset for arg in node.args]
+                if node.keywords:
+                    line = line[:node.keywords[0].value.col_offset]
+                    line = self.re.sub(r'\w+\s*=\s*$', '', line)
+                else:
+                    line = self.re.sub(r'\s*\)\s*$', '', line)
+                offsets.append(len(line))
+                args = []
+                for i in range(len(node.args)):
+                    args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
+                return args
+
+    def show(self, func_name, values, labels=None):
+        """Prints out nice representations of the given values."""
+        s = self.Stanza(self.indent)
+        s.add([func_name + ': '])
+        reprs = map(self.safe_repr, values)
+        if labels:
             sep = ''
-            for expr, arg in zip(exprs, args):
-                s.add([expr + '=', CYAN, safe_repr(arg), NORMAL], sep)
+            for label, repr in zip(labels, reprs):
+                s.add([label + '=', self.CYAN, repr, self.NORMAL], sep)
                 sep = ', '
         else:
+            sep = ''
+            for repr in reprs:
+                s.add([self.CYAN, repr, self.NORMAL], sep)
+                sep = ', '
+        self.writer.write(s.chunks)
+
+    def trace(self, func):
+        """Decorator to print out a function's arguments and return value."""
+
+        def wrapper(*args, **kwargs):
+            # Print out the call to the function with its arguments.
+            s = self.Stanza(self.indent)
+            s.add([self.GREEN, func.__name__, self.NORMAL, '('])
+            s.indent += 4
             sep = ''
             for arg in args:
-                s.add([CYAN, safe_repr(arg), NORMAL], sep)
+                s.add([self.CYAN, self.safe_repr(arg), self.NORMAL], sep)
                 sep = ', '
-    if args and kwargs:
-        s.newline()
-    if kwargs:
-        sep = ''
-        for key in sorted(kwargs.keys()):
-            s.add([key + '=', CYAN, safe_repr(kwargs[key]), NORMAL], sep)
-            sep = ', '
-    writer.write(s.chunks)
+            for name, value in sorted(kwargs.items()):
+                s.add([name + '=', self.CYAN, self.safe_repr(value),
+                       self.NORMAL], sep)
+                sep = ', '
+            s.add(')', wrap=False)
+            self.writer.write(s.chunks)
 
-def unindent(lines):
-    """Removes any indentation that is common to all of the given lines."""
-    indent = min(len(re.match(r'^ *', line).group()) for line in lines)
-    return [line[indent:].rstrip() for line in lines]
+            # Call the function.
+            self.indent += 2
+            try:
+                result = func(*args, **kwargs)
+            except:
+                # Display an exception.
+                self.indent -= 2
+                etype, evalue, etb = self.sys.exc_info()
+                info = self.inspect.getframeinfo(etb.tb_next, context=3)
+                s = self.Stanza(self.indent)
+                s.add([self.RED, '!> ', self.safe_repr(evalue), self.NORMAL])
+                s.add(['at ', info.filename, ':', info.lineno], ' ')
+                lines = self.unindent(info.code_context)
+                firstlineno = info.lineno - info.index
+                fmt = '%' + str(len(str(firstlineno + len(lines)))) + 'd'
+                for i, line in enumerate(lines):
+                    s.newline()
+                    s.add([i == info.index and self.MAGENTA or '',
+                           fmt % (i + firstlineno),
+                           i == info.index and '> ' or ': ', line, self.NORMAL])
+                self.writer.write(s.chunks)
+                raise
 
-def trace(func):
-    """Decorator to print out a function's arguments and return value."""
+            # Display the return value.
+            self.indent -= 2
+            s = self.Stanza(self.indent)
+            s.add([self.GREEN, '-> ', self.CYAN, self.safe_repr(result),
+                   self.NORMAL])
+            self.writer.write(s.chunks)
+            return result
+        return wrapper
 
-    def wrapper(*args, **kwargs):
-        global indent
+    def __call__(self, *args):
+        """If invoked as a decorator on a function, adds tracing output to the
+        function; otherwise immediately prints out the arguments."""
+        info = self.inspect.getframeinfo(self.sys._getframe(1), context=9)
 
-        # Print out the call to the function with its arguments.
-        s = Stanza(indent)
-        s.add([GREEN, func.__name__, NORMAL, '('])
-        s.indent += 4
-        sep = ''
-        for arg in args:
-            s.add([CYAN, safe_repr(arg), NORMAL], sep)
-            sep = ', '
-        for name in sorted(kwargs.keys()):
-            s.add([name + '=', CYAN, safe_repr(kwargs[name]), NORMAL], sep)
-            sep = ', '
-        s.add(')', wrap=False)
-        writer.write(s.chunks)
+        # info.index is the index of the line containing the end of the call
+        # expression, so this gets a few lines up to the end of the expression.
+        lines = (info.code_context or [])[:info.index + 1] or ['']
 
-        # Call the function.
-        indent += 2
-        try:
-            result = func(*args, **kwargs)
-        except:
-            # Display an exception.
-            indent -= 2
-            etype, evalue, etb = sys.exc_info()
-            info = inspect.getframeinfo(etb.tb_next, context=3)
-            s = Stanza(indent)
-            s.add([RED, '! ', safe_repr(evalue), NORMAL])
-            s.add(['at ', info.filename, ':', info.lineno], ' ')
-            lines = unindent(info.code_context)
-            firstlineno = info.lineno - info.index
-            fmt = '%' + str(len(str(firstlineno + len(lines)))) + 'd'
-            for i, line in enumerate(lines):
-                s.newline()
-                s.add([i == info.index and MAGENTA or '',
-                       fmt % (i + firstlineno),
-                       i == info.index and '> ' or ': ', line, NORMAL])
-            writer.write(s.chunks)
-            raise
+        # If we see "@q" on a single line, behave like a trace decorator.
+        if lines[-1].strip().startswith('@') and args:
+            return self.trace(args[0])
 
-        # Display the return value.
-        indent -= 2
-        s = Stanza(indent)
-        s.add([GREEN, '<- ', CYAN, safe_repr(result), NORMAL])
-        writer.write(s.chunks)
-        return result
-    return wrapper
+        # Otherwise, search for the beginning of the call expression; once it
+        # parses, use the expressions in the call to label the debugging output.
+        for i in range(1, len(lines) + 1):
+            labels = self.get_call_exprs(''.join(lines[-i:]).replace('\n', ''))
+            print lines[-i:], labels
+            if labels:
+                break
+        self.show(info.function, args, labels)
+        return args and args[0]
 
-q = show
-t = trace
+    def __div__(self, arg):
+        """Prints out and returns the argument."""
+        info = self.inspect.getframeinfo(self.sys._getframe(1))
+        self.show(info.function, [arg])
+        return arg
+
+    q = __call__  # backward compatibility with @q.q
+    t = trace  # backward compatibility with @q.t
+    __name__ = 'Q'  # App Engine's import hook dies if this isn't present
+
+
+# Install the Q() object in sys.modules so that "import q" gives a callable q.
+import sys
+sys.modules['q'] = Q()
