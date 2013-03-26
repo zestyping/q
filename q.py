@@ -12,20 +12,22 @@
 """Quick and dirty debugging output for tired programmers.
 
 To print the value of foo, insert this into your program:
+
     import q; q(foo)
 
-Use "q/" to print the value of something in the middle of an expression,
-while leaving the result unaffected:
-    x = q/y + z
+Use "q/" to print the value of something in the middle of an expression
+while leaving the result unaffected.  In this example, you can print the
+value of f(y) without needing to put f(y) in a temporary variable:
 
-To trace a function's arguments and return value, insert '@q' just above
-the function definition, like this:
+    x = q/f(y) + z
+
+To trace a function's arguments and return value, insert this above the def:
+
     import q
     @q
-    def foo(a, b, c):
-        ...
 
 Output will appear in /tmp/q, which you can watch with this shell command:
+
     tail -f /tmp/q
 """
 
@@ -245,7 +247,9 @@ class Q(object):
 
         # info.index is the index of the line containing the end of the call
         # expression, so this gets a few lines up to the end of the expression.
-        lines = (info.code_context or [])[:info.index + 1] or ['']
+        lines = ['']
+        if info.code_context:
+            lines = info.code_context[:info.index + 1]
 
         # If we see "@q" on a single line, behave like a trace decorator.
         if lines[-1].strip().startswith('@') and args:
@@ -255,7 +259,6 @@ class Q(object):
         # parses, use the expressions in the call to label the debugging output.
         for i in range(1, len(lines) + 1):
             labels = self.get_call_exprs(''.join(lines[-i:]).replace('\n', ''))
-            print lines[-i:], labels
             if labels:
                 break
         self.show(info.function, args, labels)
