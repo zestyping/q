@@ -25,11 +25,16 @@ Disable the tracing temporarily by calling disable after importing the module,
 which turns the q.q() and q.t calls into no-ops:
     import q
     q.disable()
+
+To use syslog instead of writing to the default "/tmp/q":
+    import q
+    q.use_syslog()
 """
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
 import ast, inspect, os, pydoc, sys, random, re, time
+import syslog
 
 OUTPUT_PATH = '/tmp/q'
 
@@ -94,9 +99,12 @@ class Writer:
         output = prefix + content.replace('\n', '\n' + indent)
         if self.path:
             try:
-                f = open(self.path, 'a')
-                f.write(output + '\n')
-                f.close()
+                if self.path == syslog:
+                    syslog.syslog(output)
+                else:
+                    f = open(self.path, 'a')
+                    f.write(output + '\n')
+                    f.close()
             except IOError:
                 pass
 
@@ -129,6 +137,12 @@ class Stanza:
 
 writer = Writer()
 indent = 0
+
+
+def use_syslog():
+    writer.path = syslog
+    writer.color = False
+
 
 def get_call_exprs(line):
     """Gets the argument expressions from the source code of a function call."""
