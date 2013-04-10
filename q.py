@@ -45,7 +45,7 @@ ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
 class Q(object):
     __doc__ = __doc__  # from the module's __doc__ above
 
-    import ast, inspect, pydoc, sys, random, re, time
+    import ast, inspect, pydoc, sys, random, re, time, code
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
@@ -135,6 +135,9 @@ class Q(object):
     def __init__(self):
         self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
         self.indent = 0
+        # in_prompt tracks whether we're in a debugging prompt.
+        # If we show() from <module> in a prompt, it will render as <prompt>
+        self.in_prompt = False
 
     def unindent(self, lines):
         """Removes any indentation that is common to all of the given lines."""
@@ -179,6 +182,8 @@ class Q(object):
     def show(self, func_name, values, labels=None):
         """Prints out nice representations of the given values."""
         s = self.Stanza(self.indent)
+        if func_name == '<module>' and self.in_prompt:
+            func_name = '<prompt>'
         s.add([func_name + ': '])
         reprs = map(self.safe_repr, values)
         if labels:
@@ -277,6 +282,27 @@ class Q(object):
     q = __call__  # backward compatibility with @q.q
     t = trace  # backward compatibility with @q.t
     __name__ = 'Q'  # App Engine's import hook dies if this isn't present
+
+    def d(self, depth=1):
+        """Launches an interactive shell at the point where it's called."""
+        info = self.inspect.getframeinfo(self.sys._getframe(1))
+        s = self.Stanza(self.indent)
+        s.add([info.function + ': '])
+        s.add([self.MAGENTA, 'Interactive Prompt Opened', self.NORMAL])
+        self.writer.write(s.chunks)
+        frame = self.sys._getframe(depth)
+        env = frame.f_globals.copy()
+        env.update(frame.f_locals)
+        self.indent += 2
+        self.in_prompt = True
+        self.code.interact(local=env)
+        self.in_prompt = False
+        self.indent -= 2
+        s = self.Stanza(self.indent)
+        s.add([info.function + ': '])
+        s.add([self.MAGENTA, 'Interactive Prompt Closed', self.NORMAL])
+        self.writer.write(s.chunks)
+
 
 
 # Install the Q() object in sys.modules so that "import q" gives a callable q.
