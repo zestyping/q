@@ -70,11 +70,11 @@ class Q(object):
 
         def __init__(self, path):
             self.path = path
-            self.open = file
+            self.open = open
             # App Engine's dev_appserver patches 'open' to simulate security
             # restrictions in production; we circumvent this to write output.
-            if file.__name__ == 'FakeFile':  # dev_appserver's patched 'file'
-                self.open = file.__bases__[0]  # the original built-in 'file'
+            if open.__name__ == 'FakeFile':  # dev_appserver's patched 'file'
+                self.open = open.__bases__[0]  # the original built-in 'file'
 
         def write(self, mode, content):
             try:
@@ -130,7 +130,7 @@ class Q(object):
 
         def add(self, items, sep='', wrap=True):
             """Adds a list of strings that are to be printed on one line."""
-            items = map(str, items)
+            items = list(map(str, items))
             size = sum([len(x) for x in items if not x.startswith('\x1b')])
             if (wrap and self.column > self.indent and
                 self.column + len(sep) + size > self.width):
@@ -155,17 +155,29 @@ class Q(object):
         indent = min(len(self.re.match(r'^ *', line).group()) for line in lines)
         return [line[indent:].rstrip() for line in lines]
 
+    def _isbasestring(self, value):
+        if self.sys.version_info >= (3,):
+            return isinstance(value, (str, bytes))
+        else:
+            return isinstance(value, basestring)
+
+    def _istext(self, value):
+        if self.sys.version_info >= (3,):
+            return isinstance(value, str)
+        else:
+            return isinstance(value, unicode)
+
     def safe_repr(self, value):
         # TODO: Use colour to distinguish '...' elision from actual '...' chars.
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
         result = self.TEXT_REPR.repr(value)
-        if isinstance(value, basestring) and len(value) > 80:
+        if self._isbasestring(value) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
-            if isinstance(value, unicode):
+            if self._istext(value):
                 value = value.encode('utf-8')
             path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
-            self.FileWriter(path).write('w', value)
+            self.FileWriter(path).write('wb', value)
             result += ' (file://' + path + ')'
         return result
 
@@ -284,11 +296,13 @@ class Q(object):
         self.show(info.function, args, labels)
         return args and args[0]
 
-    def __div__(self, arg):  # a tight-binding operator
+    def __truediv__(self, arg):  # a tight-binding operator
         """Prints out and returns the argument."""
         info = self.inspect.getframeinfo(self.sys._getframe(1))
         self.show(info.function, [arg])
         return arg
+    # Compat for Python 2 without from future import __division__ turned on
+    __div__ = __truediv__
 
     __or__ = __div__  # a loose-binding operator
     q = __call__  # backward compatibility with @q.q
