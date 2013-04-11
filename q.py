@@ -272,8 +272,9 @@ class Q(object):
             lines = info.code_context[:info.index + 1]
 
         # If we see "@q" on a single line, behave like a trace decorator.
-        if lines[-1].strip().startswith('@') and args:
-            return self.trace(args[0])
+        for line in lines:
+            if line.strip().startswith('@q') and args:
+                return self.trace(args[0])
 
         # Otherwise, search for the beginning of the call expression; once it
         # parses, use the expressions in the call to label the debugging output.
