@@ -67,6 +67,7 @@ class Q(object):
 
     class FileWriter(object):
         """An object that appends to or overwrites a single file."""
+        import sys
 
         def __init__(self, path):
             self.path = path
@@ -76,7 +77,23 @@ class Q(object):
             if open.__name__ == 'FakeFile':  # dev_appserver's patched 'file'
                 self.open = open.__bases__[0]  # the original built-in 'file'
 
+        def _isbasestring(self, value):
+            if self.sys.version_info >= (3,):
+                return isinstance(value, (str, bytes))
+            else:
+                return isinstance(value, basestring)
+
+        def _istext(self, value):
+            if self.sys.version_info >= (3,):
+                return isinstance(value, str)
+            else:
+                return isinstance(value, unicode)
+
         def write(self, mode, content):
+            if 'b' not in mode:
+                mode = '%sb' % mode
+            if self._isbasestring(content) and self._istext(content):
+                content = content.encode('utf-8')
             try:
                 f = self.open(self.path, mode)
                 f.write(content)
@@ -155,29 +172,17 @@ class Q(object):
         indent = min(len(self.re.match(r'^ *', line).group()) for line in lines)
         return [line[indent:].rstrip() for line in lines]
 
-    def _isbasestring(self, value):
-        if self.sys.version_info >= (3,):
-            return isinstance(value, (str, bytes))
-        else:
-            return isinstance(value, basestring)
-
-    def _istext(self, value):
-        if self.sys.version_info >= (3,):
-            return isinstance(value, str)
-        else:
-            return isinstance(value, unicode)
-
     def safe_repr(self, value):
         # TODO: Use colour to distinguish '...' elision from actual '...' chars.
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
         result = self.TEXT_REPR.repr(value)
-        if self._isbasestring(value) and len(value) > 80:
+        if self.writer.file_writer._isbasestring(value) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
-            if self._istext(value):
+            if self.writer.file_writer._istext(value):
                 value = value.encode('utf-8')
             path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
-            self.FileWriter(path).write('wb', value)
+            self.FileWriter(path).write('w', value)
             result += ' (file://' + path + ')'
         return result
 
