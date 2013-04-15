@@ -142,7 +142,7 @@ class Q(object):
         return [line[indent:].rstrip() for line in lines]
 
     def safe_repr(self, value):
-        # TODO: Use colour to distinguish '...' elision from actual '...' chars.
+        # TODO: Use colour to distinguish '...' ellipsis from actual '...' chars.
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
         result = self.TEXT_REPR.repr(value)
