@@ -1,7 +1,9 @@
 q
 =
 
-### Po's change log:
+------------
+
+### Change Log (after fork)
 
 1. made it to work on *Windows*
 2. on Windows, the output will be in the **current working folder**
@@ -19,6 +21,8 @@ All output goes to /tmp/q, which you can watch with this shell command:
 
     tail -f /tmp/q
 
+------------
+
 on Windows:
 
     tail -f ./loq
@@ -26,6 +30,8 @@ on Windows:
 or just  
 
     tail -f loq
+
+------------
 
 To print the value of foo, insert this into your program:
 
