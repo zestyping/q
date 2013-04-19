@@ -45,11 +45,18 @@ ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
 class Q(object):
     __doc__ = __doc__  # from the module's __doc__ above
 
-    import ast, inspect, pydoc, sys, random, re, time
+    import ast, inspect, pydoc, sys, random, re, time, os
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
-    OUTPUT_PATH = '/tmp/q'
+
+    # log? loq! On windows the log is stored in the current folder
+    # Have to make sure that it has a strange name which will never collides
+    # with other files
+    PLATFORM = sys.platform
+    IS_WINDOWS = PLATFORM.startswith("win")
+
+    OUTPUT_PATH = IS_WINDOWS and os.getcwd() + '/loq' or '/tmp/q'
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
@@ -71,7 +78,7 @@ class Q(object):
                 f.write(content)
                 f.close()
             except IOError:
-                pass
+                print "Q failed when doing IO"
 
     class Writer:
         """Abstract away the output pipe, timestamping, and color support."""
@@ -161,6 +168,7 @@ class Q(object):
         try:
             tree = self.ast.parse(line)
         except SyntaxError:
+            print "Q failed when parsing expression"
             return None
         for node in self.ast.walk(tree):
             if isinstance(node, self.ast.Call):
