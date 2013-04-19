@@ -10,6 +10,7 @@ All output goes to /tmp/q, which you can watch with this shell command::
     tail -f /tmp/q
 
 If TMPDIR is set, the output goes to $TMPDIR/q.
+On Windows, output goes to $HOME/tmp/q.
 
 To print the value of foo, insert this into your program::
 
