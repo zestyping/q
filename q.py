@@ -11,7 +11,8 @@
 
 """Quick and dirty debugging output for tired programmers.
 
-All output goes to /tmp/q, which you can watch with this shell command:
+All output goes to /tmp/q (or via the file set by a Q_EMITS_HERE environment
+variable), which you can watch with this shell command:
 
     tail -f /tmp/q
 
@@ -45,11 +46,11 @@ ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
 class Q(object):
     __doc__ = __doc__  # from the module's __doc__ above
 
-    import ast, inspect, pydoc, sys, random, re, time
+    import ast, inspect, os, pydoc, sys, random, re, time
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
-    OUTPUT_PATH = '/tmp/q'
+    OUTPUT_PATH = os.environ.get('Q_EMITS_HERE', '/tmp/q')
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
