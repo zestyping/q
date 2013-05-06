@@ -23,3 +23,7 @@ To trace a function's arguments and return value, insert this above the def:
 
     import q
     @q
+
+To start an interactive shell at any point in your code, call q.d():
+
+    import q; q.d()
