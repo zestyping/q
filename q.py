@@ -135,9 +135,9 @@ class Q(object):
     def __init__(self):
         self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
         self.indent = 0
-        # in_prompt tracks whether we're in a debugging prompt.
-        # If we show() from <module> in a prompt, it will render as <prompt>
-        self.in_prompt = False
+        # in_console tracks whether we're in an interactive console.
+        # We use it to display the caller as "<console>" instead of "<module>".
+        self.in_console = False
 
     def unindent(self, lines):
         """Removes any indentation that is common to all of the given lines."""
@@ -182,8 +182,8 @@ class Q(object):
     def show(self, func_name, values, labels=None):
         """Prints out nice representations of the given values."""
         s = self.Stanza(self.indent)
-        if func_name == '<module>' and self.in_prompt:
-            func_name = '<prompt>'
+        if func_name == '<module>' and self.in_console:
+            func_name = '<console>'
         s.add([func_name + ': '])
         reprs = map(self.safe_repr, values)
         if labels:
@@ -284,23 +284,26 @@ class Q(object):
     __name__ = 'Q'  # App Engine's import hook dies if this isn't present
 
     def d(self, depth=1):
-        """Launches an interactive shell at the point where it's called."""
+        """Launches an interactive console at the point where it's called."""
         info = self.inspect.getframeinfo(self.sys._getframe(1))
         s = self.Stanza(self.indent)
         s.add([info.function + ': '])
-        s.add([self.MAGENTA, 'Interactive Prompt Opened', self.NORMAL])
+        s.add([self.MAGENTA, 'Interactive console opened', self.NORMAL])
         self.writer.write(s.chunks)
+
         frame = self.sys._getframe(depth)
         env = frame.f_globals.copy()
         env.update(frame.f_locals)
         self.indent += 2
-        self.in_prompt = True
-        self.code.interact(local=env)
-        self.in_prompt = False
+        self.in_console = True
+        self.code.interact(
+            'Python console opened by q.d() in ' + info.function, local=env)
+        self.in_console = False
         self.indent -= 2
+
         s = self.Stanza(self.indent)
         s.add([info.function + ': '])
-        s.add([self.MAGENTA, 'Interactive Prompt Closed', self.NORMAL])
+        s.add([self.MAGENTA, 'Interactive console closed', self.NORMAL])
         self.writer.write(s.chunks)
 
 
