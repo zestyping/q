@@ -273,7 +273,7 @@ class Q(object):
 
         # If we see "@q" on a single line, behave like a trace decorator.
         for line in lines:
-            if line.strip().startswith('@q') and args:
+            if line.strip() in ('@q', '@q()') and args:
                 return self.trace(args[0])
 
         # Otherwise, search for the beginning of the call expression; once it
