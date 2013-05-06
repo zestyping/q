@@ -44,12 +44,22 @@ To start an interactive console at any point in your code, call q.d():
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
+import sys
+
 # WARNING: Horrible abuse of sys.modules, __call__, __div__, __or__, inspect,
 # sys._getframe, and more!  q's behaviour changes depending on the text of the
 # source code near its call site.  Don't ever do this in real code!
 
 # These are reused below in both Q and Writer.
 ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
+
+if sys.version_info >= (3,):
+    BASESTRING_TYPES = (str, bytes)
+    TEXT_TYPES = (str,)
+else:
+    BASESTRING_TYPES = (basestring,)
+    TEXT_TYPES = (unicode,)
+
 
 # When we insert Q() into sys.modules, all the globals become None, so we
 # have to keep everything we use inside the Q class.
@@ -65,9 +75,16 @@ class Q(object):
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
 
+    # For portably converting strings between python2 and python3
+    BASESTRING_TYPES = BASESTRING_TYPES
+    TEXT_TYPES = TEXT_TYPES
+
     class FileWriter(object):
         """An object that appends to or overwrites a single file."""
         import sys
+        # For portably converting strings between python2 and python3
+        BASESTRING_TYPES = BASESTRING_TYPES
+        TEXT_TYPES = TEXT_TYPES
 
         def __init__(self, path):
             self.path = path
@@ -77,22 +94,10 @@ class Q(object):
             if open.__name__ == 'FakeFile':  # dev_appserver's patched 'file'
                 self.open = open.__bases__[0]  # the original built-in 'file'
 
-        def _isbasestring(self, value):
-            if self.sys.version_info >= (3,):
-                return isinstance(value, (str, bytes))
-            else:
-                return isinstance(value, basestring)
-
-        def _istext(self, value):
-            if self.sys.version_info >= (3,):
-                return isinstance(value, str)
-            else:
-                return isinstance(value, unicode)
-
         def write(self, mode, content):
             if 'b' not in mode:
                 mode = '%sb' % mode
-            if self._isbasestring(content) and self._istext(content):
+            if isinstance(content, self.BASESTRING_TYPES) and isinstance(content, self.TEXT_TYPES):
                 content = content.encode('utf-8')
             try:
                 f = self.open(self.path, mode)
@@ -177,9 +182,9 @@ class Q(object):
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
         result = self.TEXT_REPR.repr(value)
-        if self.writer.file_writer._isbasestring(value) and len(value) > 80:
+        if isinstance(value, self.BASESTRING_TYPES) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
-            if self.writer.file_writer._istext(value):
+            if isinstance(value,  self.TEXT_TYPES):
                 value = value.encode('utf-8')
             path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
             self.FileWriter(path).write('w', value)
@@ -339,5 +344,4 @@ class Q(object):
 
 
 # Install the Q() object in sys.modules so that "import q" gives a callable q.
-import sys
 sys.modules['q'] = Q()
