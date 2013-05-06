@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#  Test the disabling of trace and show functions.
+#  Test some basic functionality.
 #
 #===============
 #  This is based on a skeleton test file, more information at:
@@ -12,7 +12,7 @@ import os
 import sys
 sys.path.append('..')
 
-class test_q_Disable(unittest.TestCase):
+class test_q_Basic(unittest.TestCase):
 	@classmethod
 	def setUp(self):
 		if os.path.exists('/tmp/q'):
@@ -21,7 +21,7 @@ class test_q_Disable(unittest.TestCase):
 	def tearDown(self):
 		self.setUp()
 
-	def test_q_Disable(self):
+	def test_q_Basic(self):
 		import q
 
 		@q.t
@@ -34,16 +34,5 @@ class test_q_Disable(unittest.TestCase):
 		self.assertIn('Test message', open('/tmp/q', 'r').read())
 		self.assertIn('foo', open('/tmp/q', 'r').read())
 		self.assertIn('RetVal', open('/tmp/q', 'r').read())
-
-		q.disable()
-		@q.t
-		def test(arg):
-			return 'RetVal2'
-
-		q.q('Another message')
-		self.assertEqual('RetVal2', test('bar'))
-		self.assertNotIn('Another message', open('/tmp/q', 'r').read())
-		self.assertNotIn('bar', open('/tmp/q', 'r').read())
-		self.assertNotIn('RetVal2', open('/tmp/q', 'r').read())
 
 unittest.main()

@@ -21,11 +21,6 @@ To trace a function's arguments and return value, insert this above the def:
 The output will appear in /tmp/q, which you can watch with this shell command:
     tail -f /tmp/q
 
-Disable the tracing temporarily by calling disable after importing the module,
-which turns the q.q() and q.t calls into no-ops:
-    import q
-    q.disable()
-
 To use syslog instead of writing to the default "/tmp/q":
     import q
     q.use_syslog()
@@ -242,22 +237,6 @@ def trace(func):
         writer.write(s.chunks)
         return result
     return wrapper
-
-def disable():
-    """Make the functions into no-ops to disable debugging.  Any q.t traces
-    set *AFTER* calling this function will have no effect, and q.q will not
-    log anything.  @q.t decorators used before this call will still be
-    enabled."""
-    import q
-
-    def _disabled_trace(f):
-        return f
-
-    def _disabled_show(*args, **kwargs):
-        pass
-
-    q.q = _disabled_show
-    q.t = _disabled_trace
 
 q = show
 t = trace

@@ -17,8 +17,3 @@ To trace a function's arguments and return value, insert this above the def:
 The output will appear in /tmp/q, which you can watch with this shell command:
 
     tail -f /tmp/q
-
-Disable the tracing temporarily by calling disable after importing the module,
-which turns the q.q() and q.t calls into no-ops:
-    import q
-    q.disable()
