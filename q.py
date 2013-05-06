@@ -15,27 +15,38 @@ All output goes to /tmp/q, which you can watch with this shell command:
 
     tail -f /tmp/q
 
+If TMPDIR is set, the output goes to $TMPDIR/q.
+
 To print the value of foo, insert this into your program:
 
     import q; q(foo)
 
-Use "q/" to print the value of something in the middle of an expression
-while leaving the result unaffected.  In this example, you can print the
-value of f(y) without needing to put f(y) in a temporary variable:
+To print the value of something in the middle of an expression, insert
+"q()", "q/", or "q|".  For example, given this statement:
 
-    x = q/f(y) + z
+    file.write(prefix + (sep or '').join(items))
+
+...you can print out various values without using any temporary variables:
+
+    file.write(prefix + q(sep or '').join(items))  # prints (sep or '')
+    file.write(q/prefix + (sep or '').join(items))  # prints prefix
+    file.write(q|prefix + (sep or '').join(items))  # prints the arg to write
 
 To trace a function's arguments and return value, insert this above the def:
 
     import q
     @q
+
+To start an interactive console at any point in your code, call q.d():
+
+    import q; q.d()
 """
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
-# WARNING: Horrible abuse of sys.modules, __call__, __div__, _getframe, ast,
-# inspect, and more!  q's behaviour changes depending on the text of the source
-# code near its call site.  Don't ever do this in real code!
+# WARNING: Horrible abuse of sys.modules, __call__, __div__, __or__, inspect,
+# sys._getframe, and more!  q's behaviour changes depending on the text of the
+# source code near its call site.  Don't ever do this in real code!
 
 # These are reused below in both Q and Writer.
 ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
@@ -273,12 +284,13 @@ class Q(object):
         self.show(info.function, args, labels)
         return args and args[0]
 
-    def __div__(self, arg):
+    def __div__(self, arg):  # a tight-binding operator
         """Prints out and returns the argument."""
         info = self.inspect.getframeinfo(self.sys._getframe(1))
         self.show(info.function, [arg])
         return arg
 
+    __or__ = __div__  # a loose-binding operator
     q = __call__  # backward compatibility with @q.q
     t = trace  # backward compatibility with @q.t
     __name__ = 'Q'  # App Engine's import hook dies if this isn't present
