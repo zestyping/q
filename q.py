@@ -15,27 +15,38 @@ All output goes to /tmp/q, which you can watch with this shell command:
 
     tail -f /tmp/q
 
+If TMPDIR is set, the output goes to $TMPDIR/q.
+
 To print the value of foo, insert this into your program:
 
     import q; q(foo)
 
-Use "q/" to print the value of something in the middle of an expression
-while leaving the result unaffected.  In this example, you can print the
-value of f(y) without needing to put f(y) in a temporary variable:
+To print the value of something in the middle of an expression, insert
+"q()", "q/", or "q|".  For example, given this statement:
 
-    x = q/f(y) + z
+    file.write(prefix + (sep or '').join(items))
+
+...you can print out various values without using any temporary variables:
+
+    file.write(prefix + q(sep or '').join(items))  # prints (sep or '')
+    file.write(q/prefix + (sep or '').join(items))  # prints prefix
+    file.write(q|prefix + (sep or '').join(items))  # prints the arg to write
 
 To trace a function's arguments and return value, insert this above the def:
 
     import q
     @q
+
+To start an interactive console at any point in your code, call q.d():
+
+    import q; q.d()
 """
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
-# WARNING: Horrible abuse of sys.modules, __call__, __div__, _getframe, ast,
-# inspect, and more!  q's behaviour changes depending on the text of the source
-# code near its call site.  Don't ever do this in real code!
+# WARNING: Horrible abuse of sys.modules, __call__, __div__, __or__, inspect,
+# sys._getframe, and more!  q's behaviour changes depending on the text of the
+# source code near its call site.  Don't ever do this in real code!
 
 # These are reused below in both Q and Writer.
 ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
@@ -45,18 +56,20 @@ ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
 class Q(object):
     __doc__ = __doc__  # from the module's __doc__ above
 
-    import ast, inspect, pydoc, sys, random, re, time, os
+    import ast, code, inspect, os, pydoc, sys, random, re, time
 
-    # The debugging log will go to this file; temporary files will also have
-    # this path as a prefix, followed by a random number.
-
-    # log? loq! On windows the log is stored in the current folder
-    # Have to make sure that it has a strange name which will never collides
-    # with other files
     PLATFORM = sys.platform
     IS_WINDOWS = PLATFORM.startswith("win")
-
-    OUTPUT_PATH = IS_WINDOWS and os.getcwd() + '/loq' or '/tmp/q'
+    # The debugging log will go to this file; temporary files will also have
+    # this path as a prefix, followed by a random number.
+    if IS_WINDOWS:
+        HOME = os.getenv('HOME')
+        TMP = os.path.join(home, 'tmp')
+        if not os.path.exists:
+            os.mkdir(TMP)
+        OUTPUT_PATH = os.path.join(TMP, 'q')
+    else:
+        OUTPUT_PATH = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'q')
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
@@ -142,6 +155,9 @@ class Q(object):
     def __init__(self):
         self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
         self.indent = 0
+        # in_console tracks whether we're in an interactive console.
+        # We use it to display the caller as "<console>" instead of "<module>".
+        self.in_console = False
 
     def unindent(self, lines):
         """Removes any indentation that is common to all of the given lines."""
@@ -187,6 +203,8 @@ class Q(object):
     def show(self, func_name, values, labels=None):
         """Prints out nice representations of the given values."""
         s = self.Stanza(self.indent)
+        if func_name == '<module>' and self.in_console:
+            func_name = '<console>'
         s.add([func_name + ': '])
         reprs = map(self.safe_repr, values)
         if labels:
@@ -276,15 +294,39 @@ class Q(object):
         self.show(info.function, args, labels)
         return args and args[0]
 
-    def __div__(self, arg):
+    def __div__(self, arg):  # a tight-binding operator
         """Prints out and returns the argument."""
         info = self.inspect.getframeinfo(self.sys._getframe(1))
         self.show(info.function, [arg])
         return arg
 
+    __or__ = __div__  # a loose-binding operator
     q = __call__  # backward compatibility with @q.q
     t = trace  # backward compatibility with @q.t
     __name__ = 'Q'  # App Engine's import hook dies if this isn't present
+
+    def d(self, depth=1):
+        """Launches an interactive console at the point where it's called."""
+        info = self.inspect.getframeinfo(self.sys._getframe(1))
+        s = self.Stanza(self.indent)
+        s.add([info.function + ': '])
+        s.add([self.MAGENTA, 'Interactive console opened', self.NORMAL])
+        self.writer.write(s.chunks)
+
+        frame = self.sys._getframe(depth)
+        env = frame.f_globals.copy()
+        env.update(frame.f_locals)
+        self.indent += 2
+        self.in_console = True
+        self.code.interact(
+            'Python console opened by q.d() in ' + info.function, local=env)
+        self.in_console = False
+        self.indent -= 2
+
+        s = self.Stanza(self.indent)
+        s.add([info.function + ': '])
+        s.add([self.MAGENTA, 'Interactive console closed', self.NORMAL])
+        self.writer.write(s.chunks)
 
 
 # Install the Q() object in sys.modules so that "import q" gives a callable q.
