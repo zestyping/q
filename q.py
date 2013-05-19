@@ -65,7 +65,7 @@ class Q(object):
     if IS_WINDOWS:
         HOME = os.getenv('HOME')
         TMP = os.path.join(HOME, 'tmp')
-        if not os.path.exists:
+        if not os.path.exists(TMP):
             os.mkdir(TMP)
         OUTPUT_PATH = os.path.join(TMP, 'q')
     else:
