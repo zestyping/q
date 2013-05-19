@@ -64,7 +64,7 @@ class Q(object):
     # this path as a prefix, followed by a random number.
     if IS_WINDOWS:
         HOME = os.getenv('HOME')
-        TMP = os.path.join(home, 'tmp')
+        TMP = os.path.join(HOME, 'tmp')
         if not os.path.exists:
             os.mkdir(TMP)
         OUTPUT_PATH = os.path.join(TMP, 'q')
