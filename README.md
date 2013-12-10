@@ -1,36 +1,39 @@
 q
 =
-
 Quick and dirty debugging output for tired programmers.
 
-Install q with "easy\_install -U q" or "pip install -U q".
+If `TMPDIR` or `TEMP` is set, the output file is `$TMPDIR/log.q` or `$TEMP/log.q`,
+or you can config (just need once) it with:
 
-All output goes to /tmp/q, which you can watch with this shell command::
+    q = q.config('/path/to/record_file')
 
-    tail -f /tmp/q
+You can add `q` to `__builtin__`, then you can use `q` just like `print`
 
-If TMPDIR is set, the output goes to $TMPDIR/q.
-
-To print the value of foo, insert this into your program::
-
-    import q; q(foo)
+    import __builtin__
+    import q
+    __builtin__.__dict__['q'] = q
 
 To print the value of something in the middle of an expression, insert
-"q()", "q/", or "q|".  For example, given this statement::
+`q()` `q<` `q>` or `q<>`.
+For example:  
+`foo(('1' + '2').join('3'))`
 
-    file.write(prefix + (sep or '').join(items))
+    import q
+    
+    @q
+    def foo(arg):
+        pass
+        
+    foo((q>'1' + '2').join('3'))
+    foo((q<'1' + '2').join('3'))
+    foo((q<>'1' + '2').join('3'))
+    foo(1)
 
-...you can print out various values without using any temporary variables::
-
-    file.write(prefix + q(sep or '').join(items))  # prints (sep or '')
-    file.write(q/prefix + (sep or '').join(items))  # prints prefix
-    file.write(q|prefix + (sep or '').join(items))  # prints the arg to write
-
-To trace a function's arguments and return value, insert this above the def::
+To trace a function's arguments and return value, insert this above the def:
 
     import q
     @q
 
-To start an interactive console at any point in your code, call q.d()::
+To start an interactive console at any point in your code, call `q.d()`:
 
     import q; q.d()

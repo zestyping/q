@@ -9,86 +9,88 @@
 # OR CONDITIONS OF ANY KIND, either express or implied.  See the License for
 # specific language governing permissions and limitations under the License.
 
-"""Quick and dirty debugging output for tired programmers.
-
-All output goes to /tmp/q, which you can watch with this shell command:
-
-    tail -f /tmp/q
-
-If TMPDIR is set, the output goes to $TMPDIR/q.
-
-To print the value of foo, insert this into your program:
-
-    import q; q(foo)
-
-To print the value of something in the middle of an expression, insert
-"q()", "q/", or "q|".  For example, given this statement:
-
-    file.write(prefix + (sep or '').join(items))
-
-...you can print out various values without using any temporary variables:
-
-    file.write(prefix + q(sep or '').join(items))  # prints (sep or '')
-    file.write(q/prefix + (sep or '').join(items))  # prints prefix
-    file.write(q|prefix + (sep or '').join(items))  # prints the arg to write
-
-To trace a function's arguments and return value, insert this above the def:
-
-    import q
-    @q
-
-To start an interactive console at any point in your code, call q.d():
-
-    import q; q.d()
-"""
-
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
-import sys
-
-# WARNING: Horrible abuse of sys.modules, __call__, __div__, __or__, inspect,
-# sys._getframe, and more!  q's behaviour changes depending on the text of the
+# WARNING: q's behaviour changes depending on the text of the
 # source code near its call site.  Don't ever do this in real code!
 
-# These are reused below in both Q and Writer.
-ESCAPE_SEQUENCES = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
 
+import ast, code, inspect, os, pydoc, sys, random, re, time, copy
+
+_stdout = sys.stdout
+_text_repr = pydoc.TextRepr()
+_default_output_path = os.path.join(os.environ.get('TMPDIR') or os.environ.get('TEMP') or '/tmp', 'log.q')
+_escape_sequences = ['\x1b[0m'] + ['\x1b[3%dm' % i for i in range(1, 7)]
+_normal, _red, _green, _yellow, _blue, _magenta, _cyan = _escape_sequences
 if sys.version_info >= (3,):
-    BASESTRING_TYPES = (str, bytes)
-    TEXT_TYPES = (str,)
+    _basestring_types = (str, bytes)
+    _text_types = (str,)
 else:
-    BASESTRING_TYPES = (basestring,)
-    TEXT_TYPES = (unicode,)
+    _basestring_types = (basestring,)
+    _text_types = (unicode,)
 
 
-# When we insert Q() into sys.modules, all the globals become None, so we
-# have to keep everything we use inside the Q class.
 class Q(object):
-    __doc__ = __doc__  # from the module's __doc__ above
+    """Quick and dirty debugging output for tired programmers.
 
-    import ast, code, inspect, os, pydoc, sys, random, re, time
+    If TMPDIR or TEMP is set, the output file is $TMPDIR/log.q or $TEMP/log.q,
+    or you can config it with (just need once):
 
-    # The debugging log will go to this file; temporary files will also have
-    # this path as a prefix, followed by a random number.
-    OUTPUT_PATH = os.path.join(os.environ.get('TMPDIR') or os.environ.get('TEMP') or '/tmp', 'q')
+        q = q.config('/path/to/record_file')
 
-    NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
-    TEXT_REPR = pydoc.TextRepr()
+    You can add `q` to `__builtin__`, then you can use `q` just like `print`
 
-    # For portably converting strings between python2 and python3
-    BASESTRING_TYPES = BASESTRING_TYPES
-    TEXT_TYPES = TEXT_TYPES
+        import __builtin__
+        import q
+        __builtin__.__dict__['q'] = q
+
+    To print the value of something in the middle of an expression, insert
+    `q()`, `q<`, `q>` or `q<>`.  For example:
+
+        foo(('1' + '2').join('3'))
+
+    >>> import q
+    >>> foo = lambda x: None
+    >>> # print to stdout
+    >>> foo((q>'1' + '2').join('3'))
+
+     0.0s 1    <doctest __main__.Q[2]> '12'
+
+    foo((q>'1' + '2').join('3'))
+
+    >>> # print to file
+    >>> foo((q<'1' + '2').join('3'))
+    >>> # print to file and stdout
+    >>> foo((q<>'1' + '2').join('3'))
+
+     0.0s 1    <doctest __main__.Q[4]> '12'
+
+    foo((q<>'1' + '2').join('3'))
+
+
+    >>> @q
+    ... def foo(arg):
+    ...     pass
+    ...
+    ...
+    >>> foo(1)
+
+    To trace a function's arguments and return value, insert this above the def:
+
+        import q
+        @q
+
+    To start an interactive console at any point in your code, call q.d():
+
+        import q; q.d()
+    """
 
     class FileWriter(object):
         """An object that appends to or overwrites a single file."""
-        import sys
-        # For portably converting strings between python2 and python3
-        BASESTRING_TYPES = BASESTRING_TYPES
-        TEXT_TYPES = TEXT_TYPES
-
-        def __init__(self, path):
+        def __init__(self, path, to_stdout=False):
             self.path = path
             self.open = open
+            self.to_stdout = to_stdout
             # App Engine's dev_appserver patches 'open' to simulate security
             # restrictions in production; we circumvent this to write output.
             if open.__name__ == 'FakeFile':  # dev_appserver's patched 'file'
@@ -97,45 +99,44 @@ class Q(object):
         def write(self, mode, content):
             if 'b' not in mode:
                 mode = '%sb' % mode
-            if isinstance(content, self.BASESTRING_TYPES) and isinstance(content, self.TEXT_TYPES):
+            if isinstance(content, _basestring_types) and isinstance(content, _text_types):
                 content = content.encode('utf-8')
             try:
-                f = self.open(self.path, mode)
-                f.write(content)
-                f.close()
+                if self.to_stdout:
+                    f = _stdout
+                    f.write(content)
+                else:
+                    f = self.open(self.path, mode)
+                    f.write(content)
+                    f.close()
             except IOError:
                 pass
 
+
     class Writer:
         """Abstract away the output pipe, timestamping, and color support."""
-
-        NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
-
-        def __init__(self, file_writer, time):
+        def __init__(self, file_writer):
             self.color = True
             self.file_writer = file_writer
             self.gap_seconds = 2
-            self.time = time  # the 'time' module (needed because no globals)
-            self.start_time = self.time.time()
+            self.start_time = time.time()
             self.last_write = 0
 
         def write(self, chunks):
-            """Writes out a list of strings as a single timestamped unit."""
-            if not self.color:
-                chunks = [x for x in chunks if not x.startswith('\x1b')]
             content = ''.join(chunks)
 
-            now = self.time.time()
+            now = time.time()
             prefix = '%4.1fs ' % ((now - self.start_time) % 100)
             indent = ' ' * len(prefix)
             if self.color:
-                prefix = self.YELLOW + prefix + self.NORMAL
+                prefix = _yellow + prefix + _normal
             if now - self.last_write >= self.gap_seconds:
                 prefix = '\n' + prefix
             self.last_write = now
 
-            output = prefix + content.replace('\n', '\n' + indent)
+            output = prefix + content
             self.file_writer.write('a', output + '\n')
+
 
     class Stanza:
         """Abstract away indentation and line-wrapping."""
@@ -165,8 +166,11 @@ class Q(object):
             self.column += size
 
 
-    def __init__(self):
-        self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
+    def __init__(self, output_path=None):
+        self.output_path = output_path or _default_output_path
+        self.writer_file = self.Writer(self.FileWriter(self.output_path))
+        self.writer_stdout = self.Writer(self.FileWriter(self.output_path, to_stdout=True))
+        self.writer = self.writer_file or self.writer_stdout
         self.indent = 0
         # in_console tracks whether we're in an interactive console.
         # We use it to display the caller as "<console>" instead of "<module>".
@@ -181,12 +185,12 @@ class Q(object):
         # TODO: Use colour to distinguish '...' elision from actual '...' chars.
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
-        result = self.TEXT_REPR.repr(value)
-        if isinstance(value, self.BASESTRING_TYPES) and len(value) > 80:
+        result = _text_repr.repr(value)
+        if isinstance(value, _basestring_types) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
-            if isinstance(value,  self.TEXT_TYPES):
+            if isinstance(value,  _text_types):
                 value = value.encode('utf-8')
-            path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
+            path = self.output_path + '%08d.txt' % random.randrange(1e8)
             self.FileWriter(path).write('w', value)
             result += ' (file://' + path + ')'
         return result
@@ -212,24 +216,31 @@ class Q(object):
                     args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
                 return args
 
-    def show(self, func_name, values, labels=None):
+    def _log(self, writer, traceback, values, labels=None):
         """Prints out nice representations of the given values."""
         s = self.Stanza(self.indent)
-        if func_name == '<module>' and self.in_console:
-            func_name = '<console>'
-        s.add([func_name + ': '])
+        t = traceback
+        s.add([_green,'%-4s ' % t.lineno, _normal])
+        s.add([_green, t.filename + ' ', _normal])
         reprs = map(self.safe_repr, values)
         if labels:
             sep = ''
             for label, repr in zip(labels, reprs):
-                s.add([label + '=', self.CYAN, repr, self.NORMAL], sep)
+                s.add([label + '=', _cyan, repr, _normal], sep)
                 sep = ', '
         else:
             sep = ''
             for repr in reprs:
-                s.add([self.CYAN, repr, self.NORMAL], sep)
+                s.add([_cyan, repr, _normal], sep)
                 sep = ', '
-        self.writer.write(s.chunks)
+        s.add(['\n', ''.join(t.code_context)])
+        writer.write(s.chunks)
+
+    def log_to_file(self, *args, **kwargs):
+        self._log(self.writer_file, *args, **kwargs)
+
+    def log_to_stdout(self, *args, **kwargs):
+        self._log(self.writer_stdout, *args, **kwargs)
 
     def trace(self, func):
         """Decorator to print out a function's arguments and return value."""
@@ -237,15 +248,15 @@ class Q(object):
         def wrapper(*args, **kwargs):
             # Print out the call to the function with its arguments.
             s = self.Stanza(self.indent)
-            s.add([self.GREEN, func.__name__, self.NORMAL, '('])
+            s.add([_green, func.__name__, _normal, '('])
             s.indent += 4
             sep = ''
             for arg in args:
-                s.add([self.CYAN, self.safe_repr(arg), self.NORMAL], sep)
+                s.add([_cyan, self.safe_repr(arg), _normal], sep)
                 sep = ', '
             for name, value in sorted(kwargs.items()):
-                s.add([name + '=', self.CYAN, self.safe_repr(value),
-                       self.NORMAL], sep)
+                s.add([name + '=', _cyan, self.safe_repr(value),
+                       _normal], sep)
                 sep = ', '
             s.add(')', wrap=False)
             self.writer.write(s.chunks)
@@ -257,27 +268,26 @@ class Q(object):
             except:
                 # Display an exception.
                 self.indent -= 2
-                etype, evalue, etb = self.sys.exc_info()
+                etype, evalue, etb = sys.exc_info()
                 info = self.inspect.getframeinfo(etb.tb_next, context=3)
                 s = self.Stanza(self.indent)
-                s.add([self.RED, '!> ', self.safe_repr(evalue), self.NORMAL])
+                s.add([_red, '!> ', self.safe_repr(evalue), _normal])
                 s.add(['at ', info.filename, ':', info.lineno], ' ')
                 lines = self.unindent(info.code_context)
                 firstlineno = info.lineno - info.index
                 fmt = '%' + str(len(str(firstlineno + len(lines)))) + 'd'
                 for i, line in enumerate(lines):
                     s.newline()
-                    s.add([i == info.index and self.MAGENTA or '',
+                    s.add([i == info.index and _magenta or '',
                            fmt % (i + firstlineno),
-                           i == info.index and '> ' or ': ', line, self.NORMAL])
+                           i == info.index and '> ' or ': ', line, _normal])
                 self.writer.write(s.chunks)
                 raise
 
             # Display the return value.
             self.indent -= 2
             s = self.Stanza(self.indent)
-            s.add([self.GREEN, '-> ', self.CYAN, self.safe_repr(result),
-                   self.NORMAL])
+            s.add([_green, '-> ', _cyan, self.safe_repr(result), _normal])
             self.writer.write(s.chunks)
             return result
         return wrapper
@@ -285,7 +295,7 @@ class Q(object):
     def __call__(self, *args):
         """If invoked as a decorator on a function, adds tracing output to the
         function; otherwise immediately prints out the arguments."""
-        info = self.inspect.getframeinfo(self.sys._getframe(1), context=9)
+        info = inspect.getframeinfo(sys._getframe(1), context=9)
 
         # info.index is the index of the line containing the end of the call
         # expression, so this gets a few lines up to the end of the expression.
@@ -303,31 +313,44 @@ class Q(object):
             labels = self.get_call_exprs(''.join(lines[-i:]).replace('\n', ''))
             if labels:
                 break
-        self.show(info.function, args, labels)
+        self.log_to_file(info, args, labels)
         return args and args[0]
 
-    def __truediv__(self, arg):  # a tight-binding operator
-        """Prints out and returns the argument."""
-        info = self.inspect.getframeinfo(self.sys._getframe(1))
-        self.show(info.function, [arg])
+    # <
+    def __lt__(self, arg):
+        info = inspect.getframeinfo(sys._getframe(1))
+        self.log_to_file(info, [arg])
         return arg
-    # Compat for Python 2 without from future import __division__ turned on
-    __div__ = __truediv__
 
-    __or__ = __div__  # a loose-binding operator
-    q = __call__  # backward compatibility with @q.q
-    t = trace  # backward compatibility with @q.t
-    __name__ = 'Q'  # App Engine's import hook dies if this isn't present
+    # >
+    def __gt__(self, arg):
+        info = inspect.getframeinfo(sys._getframe(1))
+        self.log_to_stdout(info, [arg])
+        return arg
+
+    # <>
+    def __ne__(self, arg):
+        info = inspect.getframeinfo(sys._getframe(1))
+        self.log_to_file(info, [arg])
+        self.log_to_stdout(info, [arg])
+        return arg
+
+    # backward compatibility with @q.q
+    q = __call__
+    # backward compatibility with @q.t
+    t = trace
+    # App Engine's import hook dies if this isn't present
+    __name__ = 'Q'
 
     def d(self, depth=1):
         """Launches an interactive console at the point where it's called."""
-        info = self.inspect.getframeinfo(self.sys._getframe(1))
+        info = inspect.getframeinfo(sys._getframe(1))
         s = self.Stanza(self.indent)
         s.add([info.function + ': '])
-        s.add([self.MAGENTA, 'Interactive console opened', self.NORMAL])
+        s.add([_magenta, 'Interactive console opened', _normal])
         self.writer.write(s.chunks)
 
-        frame = self.sys._getframe(depth)
+        frame = sys._getframe(depth)
         env = frame.f_globals.copy()
         env.update(frame.f_locals)
         self.indent += 2
@@ -339,9 +362,23 @@ class Q(object):
 
         s = self.Stanza(self.indent)
         s.add([info.function + ': '])
-        s.add([self.MAGENTA, 'Interactive console closed', self.NORMAL])
+        s.add([_magenta, 'Interactive console closed', _normal])
         self.writer.write(s.chunks)
 
+    @classmethod
+    def config(cls, filename=None):
+        """config the output path"""
+        q = Q(filename)
+        # When we insert Q() into sys.modules, all the globals become None
+        # so we have to copy everything
+        _globals = copy.copy(globals())
+        sys.modules['q'] = q
+        globals().update(_globals)
+        return q
 
-# Install the Q() object in sys.modules so that "import q" gives a callable q.
-sys.modules['q'] = Q()
+
+Q.config()
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
