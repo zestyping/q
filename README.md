@@ -1,7 +1,10 @@
-q
-=
-Quick and dirty debugging output for tired programmers.
+##Install
+`python setup.py install`
 
+##Uninstall
+`pip uninstall q`
+
+##Usage
 If `TMPDIR` or `TEMP` is set, the output file is `$TMPDIR/log.q` or `$TEMP/log.q`,
 or you can config (just need once) it with:
 
@@ -15,15 +18,15 @@ You can add `q` to `__builtin__`, then you can use `q` just like `print`
 
 To print the value of something in the middle of an expression, insert
 `q()` `q<` `q>` or `q<>`.
-For example:  
+For example:
 `foo(('1' + '2').join('3'))`
 
     import q
-    
+
     @q
     def foo(arg):
         pass
-        
+
     foo((q>'1' + '2').join('3'))
     foo((q<'1' + '2').join('3'))
     foo((q<>'1' + '2').join('3'))
