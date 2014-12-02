@@ -66,7 +66,7 @@ else:
 class Q(object):
     __doc__ = __doc__  # from the module's __doc__ above
 
-    import ast, code, inspect, os, pydoc, sys, random, re, time
+    import ast, code, inspect, os, pydoc, sys, random, re, time, pprint
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
@@ -181,6 +181,10 @@ class Q(object):
         # TODO: Use colour to distinguish '...' elision from actual '...' chars.
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
+        # Use pretty print for dictionaries
+        if isinstance(value, dict) or isinstance(value, list):
+            pp = self.pprint.PrettyPrinter(indent=0)
+            return pp.pformat(value)
         result = self.TEXT_REPR.repr(value)
         if isinstance(value, self.BASESTRING_TYPES) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
