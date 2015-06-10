@@ -131,5 +131,23 @@ class TestQBasic(unittest.TestCase):
             "self.attrib2='Attrib2'",
             ]))
 
+    def test_q_trace(self):
+        import q
+        q.writer.color = False
+
+        @q
+        def log1(msg='default'):
+            return msg
+
+        @q.t
+        def log2(msg='default'):
+            return msg
+
+        log1('log1 message')
+        log2('log2 message')
+
+        self.assertInQLog("log1\\('log1 message'\\)")
+        self.assertInQLog("log2\\('log2 message'\\)")
+
 
 unittest.main()
