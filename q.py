@@ -76,6 +76,7 @@ class Q(object):
     import random
     import re
     import time
+    import functools
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
@@ -293,7 +294,7 @@ class Q(object):
                    self.NORMAL])
             self.writer.write(s.chunks)
             return result
-        return wrapper
+        return self.functools.update_wrapper(wrapper, func)
 
     def __call__(self, *args):
         """If invoked as a decorator on a function, adds tracing output to the
