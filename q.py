@@ -293,6 +293,11 @@ class Q(object):
                    self.NORMAL])
             self.writer.write(s.chunks)
             return result
+        
+        # Copy the function info to fool introspection libraries
+        wrapper.__name__ = func.__name__
+        wrapper.__module__ = func.__module__
+        
         return wrapper
 
     def __call__(self, *args):
