@@ -7,4 +7,5 @@ python:
   - "3.4"
   - "nightly"
   - "pypy"
+install: pip install pep8
 script: make
