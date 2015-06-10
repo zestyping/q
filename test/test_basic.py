@@ -22,8 +22,15 @@ class TestQBasic(unittest.TestCase):
         self.setUp()
 
     def assertInQLog(self, string):
+        # Check the log file exists.
         self.assertTrue(os.path.exists('/tmp/q'))
-        logdata = open('/tmp/q', 'r').read()
+
+        # Read in the data
+        f = open('/tmp/q', 'r')
+        logdata = f.read()
+        f.close()
+
+        # Check the string is found in the log file
         try:
             self.assertIn(string, logdata)
         except AttributeError:
