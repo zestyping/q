@@ -21,7 +21,11 @@ class TestQBasic(unittest.TestCase):
 
     def assertInQLog(self, string):
         self.assertTrue(os.path.exists('/tmp/q'))
-        self.assertIn(string, open('/tmp/q', 'r').read())
+        logdata = open('/tmp/q', 'r').read()
+        try:
+            self.assertIn(string, logdata)
+        except AttributeError:
+            self.assertTrue(string in logdata)
 
     def test_q_log_message(self):
         import q
