@@ -43,9 +43,9 @@ To start an interactive console at any point in your code, call q.d():
     import q; q.d()
 """
 
-__author__ = 'Ka-Ping Yee <ping@zesty.ca>'
-
 import sys
+
+__author__ = 'Ka-Ping Yee <ping@zesty.ca>'
 
 # WARNING: Horrible abuse of sys.modules, __call__, __div__, __or__, inspect,
 # sys._getframe, and more!  q's behaviour changes depending on the text of the
@@ -67,11 +67,21 @@ else:
 class Q(object):
     __doc__ = __doc__  # from the module's __doc__ above
 
-    import ast, code, inspect, os, pydoc, sys, random, re, time
+    import ast
+    import code
+    import inspect
+    import os
+    import pydoc
+    import sys
+    import random
+    import re
+    import time
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
-    OUTPUT_PATH = os.path.join(os.environ.get('TMPDIR') or os.environ.get('TEMP') or '/tmp', 'q')
+    OUTPUT_PATH = os.path.join(
+        os.environ.get('TMPDIR') or os.environ.get('TEMP') or '/tmp',
+        'q')
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
@@ -98,7 +108,8 @@ class Q(object):
         def write(self, mode, content):
             if 'b' not in mode:
                 mode = '%sb' % mode
-            if isinstance(content, self.BASESTRING_TYPES) and isinstance(content, self.TEXT_TYPES):
+            if (isinstance(content, self.BASESTRING_TYPES) and
+                    isinstance(content, self.TEXT_TYPES)):
                 content = content.encode('utf-8')
             try:
                 f = self.open(self.path, mode)
@@ -156,7 +167,7 @@ class Q(object):
             items = list(map(str, items))
             size = sum([len(x) for x in items if not x.startswith('\x1b')])
             if (wrap and self.column > self.indent and
-                self.column + len(sep) + size > self.width):
+                    self.column + len(sep) + size > self.width):
                 self.chunks.append(sep.rstrip() + '\n' + ' '*self.indent)
                 self.column = self.indent
             else:
@@ -164,7 +175,6 @@ class Q(object):
                 self.column += len(sep)
             self.chunks.extend(items)
             self.column += size
-
 
     def __init__(self):
         self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
@@ -175,11 +185,12 @@ class Q(object):
 
     def unindent(self, lines):
         """Removes any indentation that is common to all of the given lines."""
-        indent = min(len(self.re.match(r'^ *', line).group()) for line in lines)
+        indent = min(
+            len(self.re.match(r'^ *', line).group()) for line in lines)
         return [line[indent:].rstrip() for line in lines]
 
     def safe_repr(self, value):
-        # TODO: Use colour to distinguish '...' elision from actual '...' chars.
+        # TODO: Use colour to distinguish '...' elision from actual '...'
         # TODO: Show a nicer repr for SRE.Match objects.
         # TODO: Show a nicer repr for big multiline strings.
         result = self.TEXT_REPR.repr(value)
@@ -268,9 +279,10 @@ class Q(object):
                 fmt = '%' + str(len(str(firstlineno + len(lines)))) + 'd'
                 for i, line in enumerate(lines):
                     s.newline()
-                    s.add([i == info.index and self.MAGENTA or '',
-                           fmt % (i + firstlineno),
-                           i == info.index and '> ' or ': ', line, self.NORMAL])
+                    s.add([
+                        i == info.index and self.MAGENTA or '',
+                        fmt % (i + firstlineno),
+                        i == info.index and '> ' or ': ', line, self.NORMAL])
                 self.writer.write(s.chunks)
                 raise
 
@@ -299,7 +311,8 @@ class Q(object):
             return self.trace(args[0])
 
         # Otherwise, search for the beginning of the call expression; once it
-        # parses, use the expressions in the call to label the debugging output.
+        # parses, use the expressions in the call to label the debugging
+        # output.
         for i in range(1, len(lines) + 1):
             labels = self.get_call_exprs(''.join(lines[-i:]).replace('\n', ''))
             if labels:

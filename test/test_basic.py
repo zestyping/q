@@ -8,7 +8,7 @@ import unittest
 import os
 import sys
 
-qpath = os.path.abspath(os.path.join(os.path.split(__file__)[0],'..'))
+qpath = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))
 sys.path.insert(0, qpath)
 
 
