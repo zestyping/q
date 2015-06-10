@@ -149,5 +149,46 @@ class TestQBasic(unittest.TestCase):
         self.assertInQLog("log1\\('log1 message'\\)")
         self.assertInQLog("log2\\('log2 message'\\)")
 
+    def test_q_nested_bad_wrapper(self):
+        # See http://micheles.googlecode.com/hg/decorator/documentation.html#statement-of-the-problem # noqa
+        import q
+        q.writer.color = False
+
+        def wrapper(func):
+            def do_nothing(*args, **kwargs):
+                return func(*args, **kwargs)
+            return do_nothing
+
+        @wrapper
+        @q
+        @wrapper
+        def decorated_log_bad(msg='default'):
+            return msg
+
+        decorated_log_bad('decorated bad message')
+        self.assertInQLog("do_nothing\\('decorated bad message'\\)")
+        self.assertInQLog("-> 'decorated bad message'")
+
+    def test_q_nested_good_wrappers(self):
+        import q
+        q.writer.color = False
+
+        import functools
+
+        def wrapper(func):
+            def do_nothing(*args, **kwargs):
+                return func(*args, **kwargs)
+            return functools.update_wrapper(do_nothing, func)
+
+        @wrapper
+        @q
+        @wrapper
+        def decorated_log_good(msg='default'):
+            return msg
+
+        decorated_log_good('decorated good message')
+        self.assertInQLog("decorated_log_good\\('decorated good message'\\)")
+        self.assertInQLog("-> 'decorated good message'")
+
 
 unittest.main()
