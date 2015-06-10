@@ -35,7 +35,7 @@ class TestQBasic(unittest.TestCase):
         # We can't use self.assertRegexpMatches as we need re.DOTALL
         expected_regexp = re.compile('.*%s.*' % string, re.DOTALL)
         if not expected_regexp.search(logdata):
-            msg = '%s: %r not found in\n%s%s%s' % (
+            msg = '%s: %r not found in\n%s\n%s\n%s' % (
                 "Regexp didn't match",
                 expected_regexp.pattern,
                 "-"*75,
@@ -61,7 +61,40 @@ class TestQBasic(unittest.TestCase):
         self.assertInQLog('ArgVal')
         self.assertInQLog('RetVal')
 
-    def test_q_argument_order(self):
+    def test_q_argument_order_arguments(self):
+        import q
+        q.writer.color = False
+
+        class A:
+            def __init__(self, two, three, four):
+                q(two, three, four)
+
+        A("ArgVal1", "ArgVal2", "ArgVal3")
+        self.assertInQLog(".*".join([
+            "__init__:",
+            "two='ArgVal1'",
+            "three='ArgVal2'",
+            "four='ArgVal3'",
+            ]))
+
+    def test_q_argument_order_attributes(self):
+        import q
+        q.writer.color = False
+
+        class A:
+            def __init__(self, two, three, four):
+                self.attrib1 = 'Attrib1'
+                self.attrib2 = 'Attrib2'
+                q(self.attrib1, self.attrib2)
+
+        A("ArgVal1", "ArgVal2", "ArgVal3")
+        self.assertInQLog(".*".join([
+            "__init__:",
+            "self.attrib1='Attrib1',",
+            "self.attrib2='Attrib2'",
+            ]))
+
+    def test_q_argument_order_attributes_and_arguments(self):
         import q
         q.writer.color = False
 
@@ -74,10 +107,10 @@ class TestQBasic(unittest.TestCase):
         A("ArgVal1", "ArgVal2", "ArgVal3")
         self.assertInQLog(".*".join([
             "__init__:",
-            "two='ArgVal1',",
-            "three='ArgVal2',",
-            "self.attrib1='Attrib1',",
-            "four='ArgVal3',",
+            "two='ArgVal1'",
+            "three='ArgVal2'",
+            "self.attrib1='Attrib1'",
+            "four='ArgVal3'",
             "self.attrib2='Attrib2'",
             ]))
 
