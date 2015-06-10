@@ -4,9 +4,10 @@
 # Test some basic functionality.
 #
 
-import unittest
 import os
+import re
 import sys
+import unittest
 
 qpath = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))
 sys.path.insert(0, qpath)
@@ -25,16 +26,23 @@ class TestQBasic(unittest.TestCase):
         # Check the log file exists.
         self.assertTrue(os.path.exists('/tmp/q'))
 
-        # Read in the data
+        # Read in the data.
         f = open('/tmp/q', 'r')
         logdata = f.read()
         f.close()
 
-        # Check the string is found in the log file
-        try:
-            self.assertIn(string, logdata)
-        except AttributeError:
-            self.assertTrue(string in logdata)
+        # Check the string is found in the log file.
+        # We can't use self.assertRegexpMatches as we need re.DOTALL
+        expected_regexp = re.compile('.*%s.*' % string, re.DOTALL)
+        if not expected_regexp.search(logdata):
+            msg = '%s: %r not found in\n%s%s%s' % (
+                "Regexp didn't match",
+                expected_regexp.pattern,
+                "-"*75,
+                logdata,
+                "-"*75,
+                )
+            raise self.failureException(msg)
 
     def test_q_log_message(self):
         import q
@@ -52,6 +60,26 @@ class TestQBasic(unittest.TestCase):
 
         self.assertInQLog('ArgVal')
         self.assertInQLog('RetVal')
+
+    def test_q_argument_order(self):
+        import q
+        q.writer.color = False
+
+        class A:
+            def __init__(self, two, three, four):
+                self.attrib1 = 'Attrib1'
+                self.attrib2 = 'Attrib2'
+                q(two, three, self.attrib1, four, self.attrib2)
+
+        A("ArgVal1", "ArgVal2", "ArgVal3")
+        self.assertInQLog(".*".join([
+            "__init__:",
+            "two='ArgVal1',",
+            "three='ArgVal2',",
+            "self.attrib1='Attrib1',",
+            "four='ArgVal3',",
+            "self.attrib2='Attrib2'",
+            ]))
 
 
 unittest.main()
