@@ -7,4 +7,4 @@ python:
   - "3.4"
   - "nightly"
   - "pypy"
-script: make test
+script: make
