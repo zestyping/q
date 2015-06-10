@@ -1,8 +1,14 @@
 TESTS = $(wildcard test/test_*.py)
 
-.PHONY: test pep8
+.PHONY: deps pep8 test build push clean
 
-all: pep8 test push
+all: pep8 test build
+
+deps:
+	# q doesn't have any *runtime* dependencies.
+	# These dependencies are only needed for development.
+	pip install pep8
+	pip install wheel
 
 pep8:
 	@echo === Running pep8 on files
@@ -16,10 +22,15 @@ test:
 			python $(TEST) || exit 1 \
 		))
 
-push:
-	# Try the builds first
+build:
 	python setup.py sdist
 	python setup.py bdist_wheel
-	# Upload the packages
+
+push: build
 	python setup.py sdist upload
 	python setup.py bdist_wheel upload
+
+clean:
+	rm -rf build dist q.egg-info
+	find -name *.pyc -delete
+	@- git status
