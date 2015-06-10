@@ -34,3 +34,7 @@ To trace a function's arguments and return value, insert this above the def::
 To start an interactive console at any point in your code, call q.d()::
 
     import q; q.d()
+
+The following
+[Lightning Talk](http://pyvideo.org/video/1858/sunday-evening-lightning-talks#t=25m15s)
+shows how powerful using q can be.
