@@ -9,6 +9,7 @@ import os
 import sys
 sys.path.append('..')
 
+
 class TestQBasic(unittest.TestCase):
 
     def setUp(self):
@@ -18,18 +19,26 @@ class TestQBasic(unittest.TestCase):
     def tearDown(self):
         self.setUp()
 
-    def test_q_basic(self):
+    def assertInQLog(self, string):
+        self.assertTrue(os.path.exists('/tmp/q'))
+        self.assertIn(string, open('/tmp/q', 'r').read())
+
+    def test_q_log_message(self):
+        import q
+        q.q('Test message')
+        self.assertInQLog('Test message')
+
+    def test_q_function_call(self):
         import q
 
         @q.t
         def test(arg):
             return 'RetVal'
 
-        q.q('Test message')
-        self.assertEqual('RetVal', test('foo'))
-        self.assertTrue(os.path.exists('/tmp/q'))
-        self.assertIn('Test message', open('/tmp/q', 'r').read())
-        self.assertIn('foo', open('/tmp/q', 'r').read())
-        self.assertIn('RetVal', open('/tmp/q', 'r').read())
+        self.assertEqual('RetVal', test('ArgVal'))
+
+        self.assertInQLog('ArgVal')
+        self.assertInQLog('RetVal')
+
 
 unittest.main()
