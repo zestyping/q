@@ -77,7 +77,7 @@ class TestQBasic(unittest.TestCase):
             "four='ArgVal3'",
             ]))
 
-    def test_q_argument_order_attributes(self):
+    def test_q_argument_order_attributes1(self):
         import q
         q.writer.color = False
 
@@ -92,6 +92,23 @@ class TestQBasic(unittest.TestCase):
             "__init__:",
             "self.attrib1='Attrib1',",
             "self.attrib2='Attrib2'",
+            ]))
+
+    def test_q_argument_order_attributes2(self):
+        import q
+        q.writer.color = False
+
+        class A:
+            def __init__(s, two, three, four):
+                s.attrib1 = 'Attrib1'
+                s.attrib2 = 'Attrib2'
+                q(s.attrib1, s.attrib2)
+
+        A("ArgVal1", "ArgVal2", "ArgVal3")
+        self.assertInQLog(".*".join([
+            "__init__:",
+            "s.attrib1='Attrib1',",
+            "s.attrib2='Attrib2'",
             ]))
 
     def test_q_argument_order_attributes_and_arguments(self):
