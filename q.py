@@ -220,9 +220,7 @@ class Q(object):
                     # In Python 3.4 the col_offset is calculated wrong. See
                     # https://bugs.python.org/issue21295
                     if isinstance(arg, self.ast.Attribute) and (
-                            self.sys.version_info[0] == 3 and
-                            self.sys.version_info[1] == 4 and
-                            self.sys.version_info[2] < 3):
+                            (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
                         offsets.append(arg.col_offset - len(arg.value.id) - 1)
                     else:
                         offsets.append(arg.col_offset)
