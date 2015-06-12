@@ -43,6 +43,8 @@ To start an interactive console at any point in your code, call q.d():
     import q; q.d()
 """
 
+from __future__ import print_function
+
 import sys
 
 __author__ = 'Ka-Ping Yee <ping@zesty.ca>'
@@ -213,7 +215,15 @@ class Q(object):
             return None
         for node in self.ast.walk(tree):
             if isinstance(node, self.ast.Call):
-                offsets = [arg.col_offset for arg in node.args]
+                offsets = []
+                for arg in node.args:
+                    # In Python 3.4 the col_offset is calculated wrong. See
+                    # https://bugs.python.org/issue21295
+                    if isinstance(arg, self.ast.Attribute) and (
+                            (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
+                        offsets.append(arg.col_offset - len(arg.value.id) - 1)
+                    else:
+                        offsets.append(arg.col_offset)
                 if node.keywords:
                     line = line[:node.keywords[0].value.col_offset]
                     line = self.re.sub(r'\w+\s*=\s*$', '', line)
