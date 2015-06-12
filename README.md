@@ -1,6 +1,8 @@
 q
 =
 
+[![Build Status](https://travis-ci.org/zestyping/q.svg)](https://travis-ci.org/zestyping/q)
+
 Quick and dirty debugging output for tired programmers.
 
 Install q with "easy\_install -U q" or "pip install -U q".
