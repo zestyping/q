@@ -275,6 +275,7 @@ class Q(object):
 
             # Call the function.
             self.indent += 2
+            start_time = self.time.time()
             try:
                 result = func(*args, **kwargs)
             except:
@@ -283,6 +284,9 @@ class Q(object):
                 etype, evalue, etb = self.sys.exc_info()
                 info = self.inspect.getframeinfo(etb.tb_next, context=3)
                 s = self.Stanza(self.indent)
+                s.add([self.YELLOW,
+                       '(+%.1fs) ' % (self.time.time() - start_time),
+                       self.NORMAL])
                 s.add([self.RED, '!> ', self.safe_repr(evalue), self.NORMAL])
                 s.add(['at ', info.filename, ':', info.lineno], ' ')
                 lines = self.unindent(info.code_context)
@@ -297,9 +301,11 @@ class Q(object):
                 self.writer.write(s.chunks)
                 raise
 
-            # Display the return value.
+            # Display the time taken and return value.
             self.indent -= 2
             s = self.Stanza(self.indent)
+            s.add([self.YELLOW, '(+%.1fs) ' % (self.time.time() - start_time),
+                   self.NORMAL])
             s.add([self.GREEN, '-> ', self.CYAN, self.safe_repr(result),
                    self.NORMAL])
             self.writer.write(s.chunks)
