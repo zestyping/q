@@ -11,7 +11,8 @@ All output goes to /tmp/q, which you can watch with this shell command::
 
     tail -f /tmp/q
 
-If TMPDIR is set, the output goes to $TMPDIR/q.
+If ![TMPDIR](https://en.wikipedia.org/wiki/TMPDIR) is set, the output goes to $TMPDIR/q.
+Note: Some alternatives to the TMPDIR variable are TEMP, TEMPDIR and TMP
 
 To print the value of foo, insert this into your program::
 
