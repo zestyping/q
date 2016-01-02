@@ -9,3 +9,14 @@ python:
   - "pypy"
 install: make deps
 script: make
+
+# Python nightly is currently failing because the released pep8 requires
+# getargspec which has been removed in Python 3.6, a patch is already in pep8
+# but it hasn't been released yet.
+# FIXME: Remove this line once a pep8 which includes
+#  https://github.com/PyCQA/pep8/commit/c86685a3fe0ff0b6f813d90677f67a4faf662791
+matrix:
+  allow_failures:
+    - python: "nightly"
+
+sudo: false
