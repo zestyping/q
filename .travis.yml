@@ -9,3 +9,7 @@ python:
   - "pypy"
 install: make deps
 script: make
+
+matrix:
+  allow_failures:
+    - python: "nightly"
