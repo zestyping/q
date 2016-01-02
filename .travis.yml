@@ -13,3 +13,5 @@ script: make
 matrix:
   allow_failures:
     - python: "nightly"
+
+sudo: false
