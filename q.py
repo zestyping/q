@@ -185,11 +185,17 @@ class Q(object):
             self.column += size
 
     def __init__(self):
-        self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), self.time)
+        time = self.time
+        self.writer = self.Writer(self.FileWriter(self.OUTPUT_PATH), time)
         self.indent = 0
         # in_console tracks whether we're in an interactive console.
         # We use it to display the caller as "<console>" instead of "<module>".
         self.in_console = False
+        startup_msg = time.strftime("\nLogging started at: %c",
+                                    time.localtime(time.time()))
+        if self.writer.color:
+            startup_msg = self.writer.YELLOW + startup_msg + self.writer.NORMAL
+        self.writer.file_writer.write('a', startup_msg)
 
     def unindent(self, lines):
         """Removes any indentation that is common to all of the given lines."""
