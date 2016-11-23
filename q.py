@@ -266,7 +266,27 @@ class Q(object):
             s.newline()
             if frame_info.code_context:
                 s.add([self.NORMAL, frame_info.code_context[0]])
+        self.writer.write(s.chunks)
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, etype, evalue, etb):
+        if evalue is None:
+            return
+        info = self.inspect.getframeinfo(etb.tb_next or etb, context=3)
+        s = self.Stanza(self.indent)
+        s.add([self.RED, '!> ', self.safe_repr(evalue), self.NORMAL])
+        s.add(['at ', info.filename, ':', info.lineno], ' ')
+        lines = self.unindent(info.code_context)
+        firstlineno = info.lineno - info.index
+        fmt = '%' + str(len(str(firstlineno + len(lines)))) + 'd'
+        for i, line in enumerate(lines):
             s.newline()
+            s.add([
+                i == info.index and self.MAGENTA or '',
+                fmt % (i + firstlineno),
+                i == info.index and '> ' or ': ', line, self.NORMAL])
         self.writer.write(s.chunks)
 
     def trace(self, func):

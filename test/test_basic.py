@@ -207,5 +207,46 @@ class TestQBasic(unittest.TestCase):
             "q.tb\(\)",
             ]))
 
+    def test_q_context_manager(self):
+        import q
+        with q:
+            pass
+        self.assertFalse(os.path.exists('/tmp/q'))
+
+    def test_q_context_manager_exc(self):
+        def value_error():
+            raise ValueError()
+
+        import q
+        try:
+            with q:
+                value_error()
+        except ValueError as e:
+            assert e
+        else:
+            assert False, 'Should have raised'
+
+        self.assertInQLog(".*".join([
+            r'ValueError\(\) at ',
+            r'def value_error\(\):',
+            r'raise ValueError\(\)',
+        ]))
+
+    def test_q_context_manager_exc_block(self):
+        import q
+        try:
+            with q:
+                raise ValueError()
+        except ValueError as e:
+            assert e
+        else:
+            assert False, 'Should have raised'
+
+        self.assertInQLog(".*".join([
+            r'ValueError\(\) at ',
+            r'with q:',
+            r'raise ValueError\(\)',
+            r'except ValueError as e:',
+        ]))
 
 unittest.main()
