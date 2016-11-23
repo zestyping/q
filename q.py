@@ -258,14 +258,14 @@ class Q(object):
         if max_depth is not None:
             max_depth -= 1
         s = self.Stanza(self.indent)
-        for frame_info in reversed(self.inspect.stack()[1:max_depth]):
-            s.add(['In ', self.RED, frame_info.function, self.NORMAL, '():'])
+        for frame, filename, lineno, module, code_context, i  in reversed(self.inspect.stack()[1:max_depth]):
+            s.add(['In ', self.RED, frame.f_code.co_name, self.NORMAL, '():'])
             s.newline()
-            s.add([self.GREEN, frame_info.filename, self.NORMAL, ':',
-                   self.BLUE, frame_info.lineno, self.NORMAL])
+            s.add([self.GREEN, filename, self.NORMAL, ':',
+                   self.BLUE, lineno, self.NORMAL])
             s.newline()
-            if frame_info.code_context:
-                s.add([self.NORMAL, frame_info.code_context[0]])
+            if code_context:
+                s.add([self.NORMAL, code_context[i]])
         self.writer.write(s.chunks)
 
     def __enter__(self):
