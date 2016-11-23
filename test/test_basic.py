@@ -190,5 +190,22 @@ class TestQBasic(unittest.TestCase):
         self.assertInQLog("decorated_log_good\\('decorated good message'\\)")
         self.assertInQLog("-> 'decorated good message'")
 
+    def test_q_tb(self):
+        import q
+
+        def a():
+            def b():
+                def c():
+                    q.tb()
+                c()
+            b()
+        a()
+        self.assertInQLog(".*".join([
+            "a\(\)",
+            "b\(\)",
+            "c\(\)",
+            "q.tb\(\)",
+            ]))
+
 
 unittest.main()
