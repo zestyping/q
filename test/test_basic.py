@@ -192,7 +192,7 @@ class TestQBasic(unittest.TestCase):
             return msg
 
         decorated_log_bad('decorated bad message')
-        self.assertInQLog("do_nothing\\('decorated bad message'\\)")
+        self.assertInQLog("do_nothing\\((?:\n\s*)?'decorated bad message'\\)")
         self.assertInQLog("-> 'decorated bad message'")
 
     def test_q_nested_good_wrappers(self):
@@ -213,8 +213,51 @@ class TestQBasic(unittest.TestCase):
             return msg
 
         decorated_log_good('decorated good message')
-        self.assertInQLog("decorated_log_good\\('decorated good message'\\)")
+        self.assertInQLog("decorated_log_good\\((?:\n\s*)?'decorated good message'\\)")
         self.assertInQLog("-> 'decorated good message'")
+
+    @unittest.skipIf(sys.version_info < (3, 3), "requires Python 3.3+")
+    def test_q_trace_method(self):
+        import q
+        q.writer.color = False
+
+        class A(object):
+            @q
+            def run1(self, arg):
+                return arg
+
+            @staticmethod
+            @q
+            def run2(arg):
+                return arg
+
+            @classmethod
+            @q
+            def run3(cls, arg):
+                return arg
+
+        a = A()
+        a.run1('first message')
+        A.run2('second message')
+        A.run3('third message')
+
+        self.assertInQLog(".*".join([
+            "\\bA.run1\\(",
+            "'first message'\\)",
+        ]))
+        self.assertInQLog("-> 'first message'")
+
+        self.assertInQLog(".*".join([
+            "\\bA.run2\\(",
+            "'second message'\\)",
+        ]))
+        self.assertInQLog("-> 'second message'")
+
+        self.assertInQLog(".*".join([
+            "\\bA.run3\\(",
+            "'third message'\\)",
+        ]))
+        self.assertInQLog("-> 'third message'")
 
 
 unittest.main()

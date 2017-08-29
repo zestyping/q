@@ -340,10 +340,13 @@ class Q(object):
     def trace(self, func):
         """Decorator to print out a function's arguments and return value."""
 
+        def get_func_name(func):
+            return getattr(func, "__qualname__", func.__name__)
+
         def wrapper(*args, **kwargs):
             # Print out the call to the function with its arguments.
             s = self.Stanza(self.indent)
-            s.add([self.GREEN, func.__name__, self.NORMAL, '('])
+            s.add([self.GREEN, get_func_name(func), self.NORMAL, '('])
             s.indent += 4
             sep = ''
             for arg in args:
