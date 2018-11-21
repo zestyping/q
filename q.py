@@ -82,9 +82,14 @@ class Q(object):
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
-    OUTPUT_PATH = os.path.join(
-        os.environ.get('TMPDIR') or os.environ.get('TEMP') or '/tmp',
-        'q')
+    if sys.platform.startswith("win"):
+        home = os.getenv('HOME')
+        tmp = os.path.join(HOME, 'tmp')
+        if not os.path.exists(tmp):
+            os.mkdir(tmp)
+        OUTPUT_PATH = os.path.join(tmp, 'q')
+    else:
+        OUTPUT_PATH = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'q')
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
