@@ -40,3 +40,8 @@ To start an interactive console at any point in your code, call q.d():
 The following
 [Lightning Talk](http://pyvideo.org/video/1858/sunday-evening-lightning-talks#t=25m15s)
 shows how powerful using q can be.
+
+# Other projects inspired by this one
+
+* [`q` for golang](https://github.com/y0ssar1an/q) 
+* [`qq` for elixir](https://github.com/mandarvaze/q)
