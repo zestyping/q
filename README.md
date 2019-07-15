@@ -45,3 +45,4 @@ shows how powerful using q can be.
 
 * [`q` for golang](https://github.com/y0ssar1an/q) 
 * [`qq` for elixir](https://github.com/mandarvaze/q)
+* [`ic` for Python](https://github.com/gruns/icecream) - Similar library for Python, inspired by `q`.
