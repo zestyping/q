@@ -259,6 +259,41 @@ class Q(object):
                 sep = ', '
         self.writer.write(s.chunks)
 
+    def tb(self, max_depth=None):
+        if max_depth is not None:
+            max_depth -= 1
+        s = self.Stanza(self.indent)
+        for frame, filename, lineno, module, code_context, i  in reversed(self.inspect.stack()[1:max_depth]):
+            s.add(['In ', self.RED, frame.f_code.co_name, self.NORMAL, '():'])
+            s.newline()
+            s.add([self.GREEN, filename, self.NORMAL, ':',
+                   self.BLUE, lineno, self.NORMAL])
+            s.newline()
+            if code_context:
+                s.add([self.NORMAL, code_context[i]])
+        self.writer.write(s.chunks)
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, etype, evalue, etb):
+        if evalue is None:
+            return
+        info = self.inspect.getframeinfo(etb.tb_next or etb, context=3)
+        s = self.Stanza(self.indent)
+        s.add([self.RED, '!> ', self.safe_repr(evalue), self.NORMAL])
+        s.add(['at ', info.filename, ':', info.lineno], ' ')
+        lines = self.unindent(info.code_context)
+        firstlineno = info.lineno - info.index
+        fmt = '%' + str(len(str(firstlineno + len(lines)))) + 'd'
+        for i, line in enumerate(lines):
+            s.newline()
+            s.add([
+                i == info.index and self.MAGENTA or '',
+                fmt % (i + firstlineno),
+                i == info.index and '> ' or ': ', line, self.NORMAL])
+        self.writer.write(s.chunks)
+
     def trace(self, func):
         """Decorator to print out a function's arguments and return value."""
 
