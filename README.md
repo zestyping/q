@@ -1,6 +1,6 @@
 # q
 
-[![Build Status](https://travis-ci.org/zestyping/q.svg)](https://travis-ci.org/zestyping/q)
+[![Code Shelter](https://www.codeshelter.co/static/badges/badge-flat.svg)](https://www.codeshelter.co/) [![Build Status](https://travis-ci.org/zestyping/q.svg)](https://travis-ci.org/zestyping/q)
 
 Quick and dirty debugging output for tired programmers.
 
