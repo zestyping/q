@@ -74,6 +74,7 @@ class Q(object):
     import inspect
     import os
     import pydoc
+    import pprint
     import sys
     import random
     import re
@@ -197,6 +198,13 @@ class Q(object):
             len(self.re.match(r'^ *', line).group()) for line in lines)
         return [line[indent:].rstrip() for line in lines]
 
+    def save_large_value(self, value):
+        if isinstance(value,  self.TEXT_TYPES):
+            value = value.encode('utf-8')
+        path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
+        self.FileWriter(path).write('w', value)
+        return path
+
     def safe_repr(self, value):
         # TODO: Use colour to distinguish '...' elision from actual '...'
         # TODO: Show a nicer repr for SRE.Match objects.
@@ -204,11 +212,17 @@ class Q(object):
         result = self.TEXT_REPR.repr(value)
         if isinstance(value, self.BASESTRING_TYPES) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
-            if isinstance(value,  self.TEXT_TYPES):
-                value = value.encode('utf-8')
-            path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
-            self.FileWriter(path).write('w', value)
+            path = self.save_large_value(value)
             result += ' (file://' + path + ')'
+        else:
+            # Use pretty print if no specific choices were found
+            pp = self.pprint.PrettyPrinter(indent=1)
+            formatted = pp.pformat(value)
+            if len(formatted) > 80:
+                path = self.save_large_value(formatted)
+                result += ' (file://' + path + ')'
+            else:
+                result = formatted
         return result
 
     def get_call_exprs(self, line):
