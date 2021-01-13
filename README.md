@@ -1,6 +1,6 @@
 # q
 
-[![Code Shelter](https://www.codeshelter.co/static/badges/badge-flat.svg)](https://www.codeshelter.co/) [![Build Status](https://travis-ci.org/zestyping/q.svg)](https://travis-ci.org/zestyping/q)
+[![Code Shelter](https://www.codeshelter.co/static/badges/badge-flat.svg)](https://www.codeshelter.co/)
 
 Quick and dirty debugging output for tired programmers.
 
@@ -42,6 +42,6 @@ To start an interactive console at any point in your code, call q.d():
 
 # Other projects inspired by this one
 
-* [`q` for golang](https://github.com/y0ssar1an/q) 
+* [`q` for golang](https://github.com/y0ssar1an/q)
 * [`qq` for elixir](https://github.com/mandarvaze/q)
 * [`ic` for Python](https://github.com/gruns/icecream) - Similar library for Python, inspired by `q`.

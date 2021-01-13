@@ -61,7 +61,7 @@ level of complexity I'd ideally want.
 ### Releases
 
 Code Shelter is authorized to maintain this project on PyPI; feel free
-to do releases when needed.  Testing is automated with Travis.
+to do releases when needed.  Testing is automated with Github Actions.
 
 Thank you!
 
