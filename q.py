@@ -79,20 +79,40 @@ class Q(object):
     import re
     import time
     import functools
+    import tempfile
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
-    if sys.platform.startswith("win"):
-        home = os.getenv('HOME')
-        tmp = os.path.join(HOME, 'tmp')
-        if not os.path.exists(tmp):
-            os.mkdir(tmp)
-        OUTPUT_PATH = os.path.join(tmp, 'q')
-    else:
-        OUTPUT_PATH = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'q')
+    OUTPUT_PATH = os.path.join(tempfile.gettempdir(), 'q')
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
+    q_max_length = 1_000_000
+
+    @property
+    def short(self):
+        __class__.TEXT_REPR = __class__.pydoc.TextRepr()
+
+    @property
+    def long(self):
+        __class__.TEXT_REPR = __class__.pydoc.TextRepr()
+        __class__.TEXT_REPR.maxarray = __class__.q_max_length
+        __class__.TEXT_REPR.maxdeque = __class__.q_max_length
+        __class__.TEXT_REPR.maxdict = __class__.q_max_length
+        __class__.TEXT_REPR.maxfrozenset = __class__.q_max_length
+        __class__.TEXT_REPR.maxlevel = __class__.q_max_length
+        __class__.TEXT_REPR.maxlist = __class__.q_max_length
+        __class__.TEXT_REPR.maxlong = __class__.q_max_length
+        __class__.TEXT_REPR.maxother = __class__.q_max_length
+        __class__.TEXT_REPR.maxset = __class__.q_max_length
+        __class__.TEXT_REPR.maxstring = __class__.q_max_length
+        __class__.TEXT_REPR.maxtuple = __class__.q_max_length
+
+    @long.setter
+    def long(self, value):
+        __class__.q_max_length = value
+        self.long
+
 
     # For portably converting strings between python2 and python3
     BASESTRING_TYPES = BASESTRING_TYPES
@@ -161,7 +181,7 @@ class Q(object):
         """Abstract away indentation and line-wrapping."""
 
         def __init__(self, indent=0, width=80 - 7):
-            self.chunks = [' '*indent]
+            self.chunks = [' ' * indent]
             self.indent = indent
             self.column = indent
             self.width = width
@@ -176,7 +196,7 @@ class Q(object):
             size = sum([len(x) for x in items if not x.startswith('\x1b')])
             if (wrap and self.column > self.indent and
                     self.column + len(sep) + size > self.width):
-                self.chunks.append(sep.rstrip() + '\n' + ' '*self.indent)
+                self.chunks.append(sep.rstrip() + '\n' + ' ' * self.indent)
                 self.column = self.indent
             else:
                 self.chunks.append(sep)
@@ -204,7 +224,7 @@ class Q(object):
         result = self.TEXT_REPR.repr(value)
         if isinstance(value, self.BASESTRING_TYPES) and len(value) > 80:
             # If the string is big, save it to a file for later examination.
-            if isinstance(value,  self.TEXT_TYPES):
+            if isinstance(value, self.TEXT_TYPES):
                 value = value.encode('utf-8')
             path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
             self.FileWriter(path).write('w', value)
@@ -375,4 +395,6 @@ class Q(object):
 
 
 # Install the Q() object in sys.modules so that "import q" gives a callable q.
-sys.modules['q'] = Q()
+q = Q()
+q.long
+sys.modules['q'] = q

@@ -40,8 +40,22 @@ To start an interactive console at any point in your code, call q.d():
 
     import q; q.d()
 
+By default the output of q is not truncated, but it can be truncated by calling:
+
+    q.short
+
+Truncation can be reversed by:
+
+```python
+q.long # Truncates output to 1,000,000
+q.long = 2000000 # Truncates output to 2,000,000
+```
 # Other projects inspired by this one
 
 * [`q` for golang](https://github.com/y0ssar1an/q)
 * [`qq` for elixir](https://github.com/mandarvaze/q)
 * [`ic` for Python](https://github.com/gruns/icecream) - Similar library for Python, inspired by `q`.
+
+The following
+[Lightning Talk](http://pyvideo.org/video/1858/sunday-evening-lightning-talks#t=25m15s)
+shows how powerful using q can be.
