@@ -60,8 +60,8 @@ if sys.version_info >= (3,):
     BASESTRING_TYPES = (str, bytes)
     TEXT_TYPES = (str,)
 else:
-    BASESTRING_TYPES = (basestring,)
-    TEXT_TYPES = (unicode,)
+    BASESTRING_TYPES = (basestring,)  # noqa
+    TEXT_TYPES = (unicode,)  # noqa
 
 
 # When we insert Q() into sys.modules, all the globals become None, so we
@@ -112,7 +112,6 @@ class Q(object):
     def long(self, value):
         __class__.q_max_length = value
         self.long
-
 
     # For portably converting strings between python2 and python3
     BASESTRING_TYPES = BASESTRING_TYPES
@@ -302,7 +301,7 @@ class Q(object):
             self.indent += 2
             try:
                 result = func(*args, **kwargs)
-            except:
+            except Exception:
                 # Display an exception.
                 self.indent -= 2
                 etype, evalue, etb = self.sys.exc_info()
