@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: [2.7, 3.4, 3.5, 3.6, 3.7, 3.8, pypy3]
+        python-version: [2.7, 3.5, 3.6, 3.7, 3.8, pypy3]
 
     steps:
     - uses: actions/checkout@v2
