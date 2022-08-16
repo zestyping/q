@@ -1,18 +1,18 @@
 TESTS = $(wildcard test/test_*.py)
 
-.PHONY: deps pep8 test build push clean
+.PHONY: deps pycodestyle test build push clean
 
-all: pep8 test build
+all: pycodestyle test build
 
 deps:
 	# q doesn't have any *runtime* dependencies.
 	# These dependencies are only needed for development.
-	pip install pep8
+	pip install pycodestyle
 	pip install wheel
 
-pep8:
-	@echo === Running pep8 on files
-	pep8 $(wildcard *.py) $(wildcard test/*.py)
+pycodestyle:
+	@echo === Running pycodestyle on files
+	pycodestyle $(wildcard *.py) $(wildcard test/*.py)
 
 test:
 	@echo
