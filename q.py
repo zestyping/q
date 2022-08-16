@@ -87,7 +87,7 @@ class Q(object):
 
     NORMAL, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN = ESCAPE_SEQUENCES
     TEXT_REPR = pydoc.TextRepr()
-    q_max_length = 1_000_000
+    q_max_length = 1000000
 
     @property
     def short(self):
