@@ -71,15 +71,15 @@ class Q(object):
 
     import ast
     import code
+    import functools
     import inspect
     import os
     import pydoc
-    import sys
     import random
     import re
-    import time
-    import functools
+    import sys
     import tempfile
+    import time
 
     # The debugging log will go to this file; temporary files will also have
     # this path as a prefix, followed by a random number.
@@ -120,6 +120,7 @@ class Q(object):
     class FileWriter(object):
         """An object that appends to or overwrites a single file."""
         import sys
+
         # For portably converting strings between python2 and python3
         BASESTRING_TYPES = BASESTRING_TYPES
         TEXT_TYPES = TEXT_TYPES
