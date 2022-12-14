@@ -226,7 +226,7 @@ class Q(object):
             # If the string is big, save it to a file for later examination.
             if isinstance(value, self.TEXT_TYPES):
                 value = value.encode('utf-8')
-            path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(1e8)
+            path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(100000000)
             self.FileWriter(path).write('w', value)
             result += ' (file://' + path + ')'
         return result
