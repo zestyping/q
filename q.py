@@ -71,6 +71,7 @@ class Q(object):
 
     import ast
     import code
+    import dis
     import functools
     import inspect
     import os
@@ -226,39 +227,96 @@ class Q(object):
             # If the string is big, save it to a file for later examination.
             if isinstance(value, self.TEXT_TYPES):
                 value = value.encode('utf-8')
-            path = self.OUTPUT_PATH + '%08d.txt' % self.random.randrange(100000000)
+            path = self.OUTPUT_PATH + (
+                    '%08d.txt' % self.random.randrange(100000000))
             self.FileWriter(path).write('w', value)
             result += ' (file://' + path + ')'
         return result
 
-    def get_call_exprs(self, line):
+    class CallVisitor(ast.NodeVisitor):
+        def __init__(self, call_position):
+            self.current_position = 0
+            self.call_position = call_position
+            self.call_node = None
+
+        def visit_Call(self, node):
+            # Arguments have a lower call position then the function call
+            # For instance, in q(q(1) + q(2)),
+            # q(1) has position 0, q(2) has position 1,
+            # and q(q(1) + q(2)) has position 2
+            for arg in node.args:
+                self.visit(arg)
+
+            if self.current_position == self.call_position:
+                self.call_node = node
+
+            self.current_position += 1
+
+    def get_call_exprs(self, caller_frame, line):
         """Gets the argument expressions from the source of a function call."""
         line = line.lstrip()
         try:
             tree = self.ast.parse(line)
         except SyntaxError:
             return None
-        for node in self.ast.walk(tree):
-            if isinstance(node, self.ast.Call):
-                offsets = []
-                for arg in node.args:
-                    # In Python 3.4 the col_offset is calculated wrong. See
-                    # https://bugs.python.org/issue21295
-                    if isinstance(arg, self.ast.Attribute) and (
-                            (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
-                        offsets.append(arg.col_offset - len(arg.value.id) - 1)
-                    else:
-                        offsets.append(arg.col_offset)
-                if node.keywords:
-                    line = line[:node.keywords[0].value.col_offset]
-                    line = self.re.sub(r'\w+\s*=\s*$', '', line)
-                else:
-                    line = self.re.sub(r'\s*\)\s*$', '', line)
-                offsets.append(len(line))
-                args = []
-                for i in range(len(node.args)):
-                    args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
-                return args
+
+        # There can be multiple function calls on a line
+        # (for example: q(1) + q(2)), so in order to show
+        # correct output, we need to identify what function call we
+        # are getting the call expressions for. To do this, we can
+        # use frame data to get the caller's bytecode and the
+        # bytecode instruction being executed. We can then
+        # count the number of CALL_* opcodes before the condition
+        # `instruction.starts_line is not None` is met.
+        caller_bytecode = caller_frame.f_code
+        call_bytecode_instruction_offset = caller_frame.f_lasti
+        bytecode_instructions = \
+            tuple(self.dis.get_instructions(caller_bytecode))
+        call_bytecode_instruction_index = 0
+        for instruction in bytecode_instructions:
+            if instruction.offset == call_bytecode_instruction_offset:
+                break
+            elif instruction.offset > call_bytecode_instruction_offset:
+                # It seems sometimes CACHE instructions cause
+                # caller_frame.f_lasti to be after the call instruction offset
+                call_bytecode_instruction_index -= 1
+                break
+            call_bytecode_instruction_index += 1
+
+        current_bytecode_instruction = \
+            bytecode_instructions[call_bytecode_instruction_index]
+        position_of_call_on_line = 0
+        instruction_index = call_bytecode_instruction_index
+        while current_bytecode_instruction.starts_line is None:
+            instruction_index = instruction_index - 1
+            current_bytecode_instruction = \
+                bytecode_instructions[instruction_index]
+            if current_bytecode_instruction.opname.startswith('CALL'):
+                position_of_call_on_line += 1
+
+        call_visitor = self.CallVisitor(position_of_call_on_line)
+        call_visitor.visit(tree)
+        node = call_visitor.call_node
+
+        offsets = []
+        for arg in node.args:
+            # In Python 3.4 the col_offset is calculated wrong. See
+            # https://bugs.python.org/issue21295
+            if isinstance(arg, self.ast.Attribute) and (
+                    (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
+                offsets.append(arg.col_offset - len(arg.value.id) - 1)
+            else:
+                offsets.append(arg.col_offset)
+        if node.keywords:
+            line = line[:node.keywords[0].value.col_offset]
+            line = self.re.sub(r'\w+\s*=\s*$', '', line)
+        else:
+            line = self.re.sub(r'\s*\)\s*$', '', line)
+        offsets.append(node.end_col_offset - 1)
+        args = []
+        for i in range(len(node.args)):
+            args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
+        return args
 
     def show(self, func_name, values, labels=None):
         """Prints out nice representations of the given values."""
@@ -334,7 +392,8 @@ class Q(object):
     def __call__(self, *args):
         """If invoked as a decorator on a function, adds tracing output to the
         function; otherwise immediately prints out the arguments."""
-        info = self.inspect.getframeinfo(self.sys._getframe(1), context=9)
+        caller_frame = self.sys._getframe(1)
+        info = self.inspect.getframeinfo(caller_frame, context=9)
 
         # info.index is the index of the line containing the end of the call
         # expression, so this gets a few lines up to the end of the expression.
@@ -351,7 +410,8 @@ class Q(object):
         # parses, use the expressions in the call to label the debugging
         # output.
         for i in range(1, len(lines) + 1):
-            labels = self.get_call_exprs(''.join(lines[-i:]).replace('\n', ''))
+            labels = self.get_call_exprs(caller_frame,
+                                         ''.join(lines[-i:]).replace('\n', ''))
             if labels:
                 break
         self.show(info.function, args, labels)
