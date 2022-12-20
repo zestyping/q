@@ -111,6 +111,32 @@ class TestQBasic(unittest.TestCase):
             "s.attrib2='Attrib2'",
             ]))
 
+    def test_q_multiple_calls_on_line(self):
+        import q
+        q.writer.color = False
+
+        class A:
+            def __init__(self, two, three, four):
+                self.attrib1 = 'Attrib1'
+                self.attrib2 = 'Attrib2'
+                q(q(two, self.attrib1) + q(three, self.attrib2), four)
+
+        A("ArgVal1", "ArgVal2", "ArgVal3")
+        self.assertInQLog(".*".join([
+            "__init__:",
+            "two='ArgVal1',",
+            "self.attrib1='Attrib1'",
+            "__init__:",
+            "three='ArgVal2',",
+            "self.attrib2='Attrib2'",
+            "__init__:",
+            # `q(two, self.attrib1) + q(three, self.attrib2)='ArgVal1ArgVal2',`
+            # does not work despite that text being in the log, so just test
+            # for `'ArgVal1ArgVal2',`
+            "'ArgVal1ArgVal2',",
+            "four='ArgVal3'",
+            ]))
+
     def test_q_argument_order_attributes_and_arguments(self):
         import q
         q.writer.color = False
@@ -129,7 +155,7 @@ class TestQBasic(unittest.TestCase):
             "self.attrib1='Attrib1'",
             "four='ArgVal3'",
             "self.attrib2='Attrib2'",
-            ]))
+        ]))
 
     def test_q_trace(self):
         import q
