@@ -111,6 +111,7 @@ class TestQBasic(unittest.TestCase):
             "s.attrib2='Attrib2'",
             ]))
 
+    @unittest.skipIf(sys.version_info < (3, 8), "requires Python 3.8+")
     def test_q_multiple_calls_on_line(self):
         import q
         q.writer.color = False

@@ -260,6 +260,35 @@ class Q(object):
         except SyntaxError:
             return None
 
+        if self.sys.version_info >= (3, 8):
+            return self._get_accurate_call_exprs(caller_frame, line, tree)
+
+        return self._get_basic_call_exprs(caller_frame, line, tree)
+
+    def _get_basic_call_exprs(self, caller_frame, line, tree):
+        for node in self.ast.walk(tree):
+            if isinstance(node, self.ast.Call):
+                offsets = []
+                for arg in node.args:
+                    # In Python 3.4 the col_offset is calculated wrong. See
+                    # https://bugs.python.org/issue21295
+                    if isinstance(arg, self.ast.Attribute) and (
+                            (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
+                        offsets.append(arg.col_offset - len(arg.value.id) - 1)
+                    else:
+                        offsets.append(arg.col_offset)
+                if node.keywords:
+                    line = line[:node.keywords[0].value.col_offset]
+                    line = self.re.sub(r'\w+\s*=\s*$', '', line)
+                else:
+                    line = self.re.sub(r'\s*\)\s*$', '', line)
+                offsets.append(len(line))
+                args = []
+                for i in range(len(node.args)):
+                    args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
+                return args
+
+    def _get_accurate_call_exprs(self, caller_frame, line, tree):
         # There can be multiple function calls on a line
         # (for example: q(1) + q(2)), so in order to show
         # correct output, we need to identify what function call we
@@ -300,13 +329,7 @@ class Q(object):
 
         offsets = []
         for arg in node.args:
-            # In Python 3.4 the col_offset is calculated wrong. See
-            # https://bugs.python.org/issue21295
-            if isinstance(arg, self.ast.Attribute) and (
-                    (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
-                offsets.append(arg.col_offset - len(arg.value.id) - 1)
-            else:
-                offsets.append(arg.col_offset)
+            offsets.append(arg.col_offset)
         if node.keywords:
             line = line[:node.keywords[0].value.col_offset]
             line = self.re.sub(r'\w+\s*=\s*$', '', line)
