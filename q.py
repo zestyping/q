@@ -269,6 +269,11 @@ class Q(object):
         return self._get_basic_call_exprs(caller_frame, line, tree)
 
     def _get_basic_call_exprs(self, caller_frame, line, tree):
+        """Gets the argument expressions from the source of a function call.
+
+        Slightly buggy (multiple calls to q() on a single line cause garbled
+        output, #67), but works on all Python versions.
+        """
         for node in self.ast.walk(tree):
             if isinstance(node, self.ast.Call):
                 offsets = []
@@ -292,6 +297,10 @@ class Q(object):
                 return args
 
     def _get_accurate_call_exprs(self, caller_frame, line, tree):
+        """Gets the argument expressions from the source of a function call.
+
+        Accurate, but depends on Python 3.8+.
+        """
         # There can be multiple function calls on a line
         # (for example: q(1) + q(2)), so in order to show
         # correct output, we need to identify what function call we
