@@ -111,6 +111,7 @@ class TestQBasic(unittest.TestCase):
             "s.attrib2='Attrib2'",
             ]))
 
+    @unittest.skipIf(sys.version_info < (3, 8), "requires Python 3.8+")
     def test_q_multiple_calls_on_line(self):
         import q
         q.writer.color = False
@@ -192,8 +193,8 @@ class TestQBasic(unittest.TestCase):
             return msg
 
         decorated_log_bad('decorated bad message')
-        self.assertInQLog("do_nothing\\((?:\n\s*)?'"
-                          "decorated bad message'\\)")
+        self.assertInQLog(r"do_nothing\((?:\n\s*)?'"
+                          r"decorated bad message'\)")
         self.assertInQLog("-> 'decorated bad message'")
 
     def test_q_nested_good_wrappers(self):
@@ -214,8 +215,8 @@ class TestQBasic(unittest.TestCase):
             return msg
 
         decorated_log_good('decorated good message')
-        self.assertInQLog("decorated_log_good\\((?:\n\s*)?'"
-                          "decorated good message'\\)")
+        self.assertInQLog(r"decorated_log_good\((?:\n\s*)?'"
+                          r"decorated good message'\)")
         self.assertInQLog("-> 'decorated good message'")
 
     @unittest.skipIf(sys.version_info < (3, 3), "requires Python 3.3+")

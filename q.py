@@ -92,26 +92,29 @@ class Q(object):
 
     @property
     def short(self):
-        __class__.TEXT_REPR = __class__.pydoc.TextRepr()
+        cls = self.__class__
+        cls.TEXT_REPR = cls.pydoc.TextRepr()
 
     @property
     def long(self):
-        __class__.TEXT_REPR = __class__.pydoc.TextRepr()
-        __class__.TEXT_REPR.maxarray = __class__.q_max_length
-        __class__.TEXT_REPR.maxdeque = __class__.q_max_length
-        __class__.TEXT_REPR.maxdict = __class__.q_max_length
-        __class__.TEXT_REPR.maxfrozenset = __class__.q_max_length
-        __class__.TEXT_REPR.maxlevel = __class__.q_max_length
-        __class__.TEXT_REPR.maxlist = __class__.q_max_length
-        __class__.TEXT_REPR.maxlong = __class__.q_max_length
-        __class__.TEXT_REPR.maxother = __class__.q_max_length
-        __class__.TEXT_REPR.maxset = __class__.q_max_length
-        __class__.TEXT_REPR.maxstring = __class__.q_max_length
-        __class__.TEXT_REPR.maxtuple = __class__.q_max_length
+        cls = self.__class__
+        cls.TEXT_REPR = cls.pydoc.TextRepr()
+        cls.TEXT_REPR.maxarray = cls.q_max_length
+        cls.TEXT_REPR.maxdeque = cls.q_max_length
+        cls.TEXT_REPR.maxdict = cls.q_max_length
+        cls.TEXT_REPR.maxfrozenset = cls.q_max_length
+        cls.TEXT_REPR.maxlevel = cls.q_max_length
+        cls.TEXT_REPR.maxlist = cls.q_max_length
+        cls.TEXT_REPR.maxlong = cls.q_max_length
+        cls.TEXT_REPR.maxother = cls.q_max_length
+        cls.TEXT_REPR.maxset = cls.q_max_length
+        cls.TEXT_REPR.maxstring = cls.q_max_length
+        cls.TEXT_REPR.maxtuple = cls.q_max_length
 
     @long.setter
     def long(self, value):
-        __class__.q_max_length = value
+        cls = self.__class__
+        cls.q_max_length = value
         self.long
 
     # For portably converting strings between python2 and python3
@@ -260,6 +263,44 @@ class Q(object):
         except SyntaxError:
             return None
 
+        if self.sys.version_info >= (3, 8):
+            return self._get_accurate_call_exprs(caller_frame, line, tree)
+
+        return self._get_basic_call_exprs(caller_frame, line, tree)
+
+    def _get_basic_call_exprs(self, caller_frame, line, tree):
+        """Gets the argument expressions from the source of a function call.
+
+        Slightly buggy (multiple calls to q() on a single line cause garbled
+        output, #67), but works on all Python versions.
+        """
+        for node in self.ast.walk(tree):
+            if isinstance(node, self.ast.Call):
+                offsets = []
+                for arg in node.args:
+                    # In Python 3.4 the col_offset is calculated wrong. See
+                    # https://bugs.python.org/issue21295
+                    if isinstance(arg, self.ast.Attribute) and (
+                            (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
+                        offsets.append(arg.col_offset - len(arg.value.id) - 1)
+                    else:
+                        offsets.append(arg.col_offset)
+                if node.keywords:
+                    line = line[:node.keywords[0].value.col_offset]
+                    line = self.re.sub(r'\w+\s*=\s*$', '', line)
+                else:
+                    line = self.re.sub(r'\s*\)\s*$', '', line)
+                offsets.append(len(line))
+                args = []
+                for i in range(len(node.args)):
+                    args.append(line[offsets[i]:offsets[i + 1]].rstrip(', '))
+                return args
+
+    def _get_accurate_call_exprs(self, caller_frame, line, tree):
+        """Gets the argument expressions from the source of a function call.
+
+        Accurate, but depends on Python 3.8+.
+        """
         # There can be multiple function calls on a line
         # (for example: q(1) + q(2)), so in order to show
         # correct output, we need to identify what function call we
@@ -300,13 +341,7 @@ class Q(object):
 
         offsets = []
         for arg in node.args:
-            # In Python 3.4 the col_offset is calculated wrong. See
-            # https://bugs.python.org/issue21295
-            if isinstance(arg, self.ast.Attribute) and (
-                    (3, 4, 0) <= self.sys.version_info <= (3, 4, 3)):
-                offsets.append(arg.col_offset - len(arg.value.id) - 1)
-            else:
-                offsets.append(arg.col_offset)
+            offsets.append(arg.col_offset)
         if node.keywords:
             line = line[:node.keywords[0].value.col_offset]
             line = self.re.sub(r'\w+\s*=\s*$', '', line)
