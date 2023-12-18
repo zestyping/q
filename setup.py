@@ -1,7 +1,12 @@
 from setuptools import setup
+
+with open('README.md') as f:
+    readme = f.read()
+
 setup(
     name='q', version='2.7', py_modules=['q'],
     description='Quick-and-dirty debugging output for tired programmers',
+    long_description=readme, long_description_content_type='text/markdown',
     author='Ka-Ping Yee', author_email='ping@zesty.ca',
     license='Apache License 2.0',
     classifiers=[
